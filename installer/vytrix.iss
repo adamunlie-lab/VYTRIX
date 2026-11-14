@@ -54,5 +54,5 @@ begin
   Result := ExpandConstant('{param:VYTRIXUPDATE|0}') = '1';
 end;
 
-; User data (%LocalAppData%\VYTRIX: change journal, backups, logs) is intentionally
-; kept on uninstall so changes made by VYTRIX can still be reviewed and reverted.
+// User data (%LocalAppData%\VYTRIX: change journal, backups, logs) is intentionally
+// kept on uninstall so changes made by VYTRIX can still be reviewed and reverted.
