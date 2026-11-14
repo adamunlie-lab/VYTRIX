@@ -59,7 +59,7 @@ src/Vytrix/
                             ThemeManager, UI kit
   Views/                    one class per page
   Themes/Theme.xaml         palette, typography, custom icon set, control styles
-tests/Vytrix.Tests/         xUnit tests (73, incl. 13 admin)
+tests/Vytrix.Tests/         xUnit tests (88, incl. 13 admin)
 legal/TERMS.txt             Terms of Agreement (embedded in the app and shown by the installer)
 tools/                      icon generator, screenshot + UI-automation QA scripts
 installer/vytrix.iss        Inno Setup script
@@ -123,14 +123,24 @@ These terms were drafted for this project and are not legal advice. Have a lawye
 - **Settings:** theme, accent colour (Violet / Cyan / Emerald / Amber / Rose / Sakura), falling petals, reduced motion, monitoring interval, safety switches, update feed, report export and Explorer restart.
 - **Global search** (Ctrl+K) across pages, tweaks and profiles.
 - **Reports:** HTML and JSON system reports in `Documents\VYTRIX Reports`.
-- **Updates:** reads an HTTPS JSON manifest (`version`, `url`, `sha256`, `notes`), downloads the installer, verifies its SHA-256 and only then offers to run it. No feed is configured by default.
+- **Auto-update from GitHub releases.** VYTRIX reads `releases/latest/download/latest.json` from [adamunlie-lab/VYTRIX](https://github.com/adamunlie-lab/VYTRIX/releases) at startup and every 6 hours.
+  - If there's a newer version, it downloads the installer in the background (only from GitHub release hosting, including after redirects) and verifies its SHA-256.
+  - It then offers **Install now / Later** with the release notes. Install now runs setup in update mode: a progress window and one administrator prompt. VYTRIX closes, updates in place (settings, journal and backups are kept) and reopens as the normal user.
+  - Nothing ever installs without your confirmation. Automatic checks and background downloads can be turned off in Settings → Updates.
+  - Verified end to end: 1.0.0 updated itself to 1.0.1 from the live releases (`tools\update-e2e.ps1`).
+
+### Publishing a release
+```powershell
+powershell -File tools\publish-release.ps1 -Version 1.0.2 -Notes "What changed"
+```
+This builds at that version, runs the tests, compiles the installer, computes the SHA-256, writes `latest.json`, and creates GitHub release `v1.0.2` with the installer, the portable zip and `latest.json`. Every installed copy is offered it automatically. Version numbers must increase. Releases aren't code-signed yet, so Windows SmartScreen may warn on a first manual download until the publisher has a code-signing certificate.
 
 ---
 
 ## Testing
 
 ```powershell
-dotnet test tests\Vytrix.Tests\Vytrix.Tests.csproj     # 73 automated tests (admin ones skip unless elevated)
+dotnet test tests\Vytrix.Tests\Vytrix.Tests.csproj     # 88 automated tests (admin ones skip unless elevated)
 powershell -File tools\qa-motion.ps1                    # proves the tree animates; CPU active vs minimised
 powershell -File tools\qa-theme-switch.ps1              # live theme switching via Settings
 powershell -File tools\admin-qa.ps1                     # elevated QA: full suite as admin + admin UI checks (UAC prompt)

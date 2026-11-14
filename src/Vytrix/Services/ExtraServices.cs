@@ -641,6 +641,15 @@ public static class Updater
         return http;
     }
 
+    /// <summary>Adds a unique query parameter (keeping any existing query) to bypass CDN caches.</summary>
+    internal static Uri WithCacheBuster(Uri uri)
+    {
+        var b = new UriBuilder(uri);
+        var stamp = $"vx={DateTime.UtcNow.Ticks}";
+        b.Query = string.IsNullOrEmpty(b.Query) || b.Query == "?" ? stamp : b.Query.TrimStart('?') + "&" + stamp;
+        return b.Uri;
+    }
+
     internal static bool IsTrustedDownload(Uri uri) =>
         uri.Scheme == Uri.UriSchemeHttps && TrustedHosts.Any(h => uri.Host.Equals(h, StringComparison.OrdinalIgnoreCase));
 
@@ -664,7 +673,10 @@ public static class Updater
         try
         {
             using var http = Client(TimeSpan.FromSeconds(20));
-            using var resp = await http.GetAsync(uri);
+            // GitHub briefly caches the "latest" redirect; ask for a fresh copy so new releases are seen at once.
+            using var req = new HttpRequestMessage(HttpMethod.Get, WithCacheBuster(uri));
+            req.Headers.CacheControl = new System.Net.Http.Headers.CacheControlHeaderValue { NoCache = true };
+            using var resp = await http.SendAsync(req);
             if (resp.StatusCode == System.Net.HttpStatusCode.NotFound) return (null, "No VYTRIX release has been published yet.");
             resp.EnsureSuccessStatusCode();
             var r = Evaluate(await resp.Content.ReadAsStringAsync(), Current);

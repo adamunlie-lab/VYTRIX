@@ -52,6 +52,15 @@ public class UpdaterTests
         Assert.DoesNotContain("OWNER", Updater.Repository);   // must be the real repository before release
     }
 
+    [Fact]
+    public void Cache_buster_keeps_the_feed_address_and_existing_query()
+    {
+        var plain = Updater.WithCacheBuster(new Uri(Updater.DefaultFeed));
+        Assert.StartsWith(Updater.DefaultFeed + "?vx=", plain.AbsoluteUri);
+        var withQuery = Updater.WithCacheBuster(new Uri("https://example.com/feed.json?channel=beta"));
+        Assert.Contains("channel=beta&vx=", withQuery.Query);
+    }
+
     [Theory]
     [InlineData("https://objects.githubusercontent.com/github-production-release-asset/1/2", true)]
     [InlineData("https://release-assets.githubusercontent.com/github-production-release-asset/1/2", true)]
