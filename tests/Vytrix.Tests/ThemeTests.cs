@@ -55,8 +55,24 @@ public class ThemeTests
     [Fact]
     public void Theme_names_are_stable()
     {
-        Assert.Equal(["Cherry Blossom", "Graphite"], ThemeManager.Themes);
+        Assert.Equal(["Christmas", "Cherry Blossom", "Graphite"], ThemeManager.Themes);
         Assert.Contains(ThemeManager.Accents, x => x.Name == "Sakura");
-        Assert.Equal("Cherry Blossom", new Core.AppSettings().Theme);
+        Assert.Contains(ThemeManager.Accents, x => x.Name == "Crimson");
+        Assert.Equal("Christmas", new Core.AppSettings().Theme);
+        foreach (var t in ThemeManager.Themes) Assert.Contains(ThemeManager.Accents, a => a.Name == ThemeManager.DefaultAccent(t));
+    }
+
+    [Fact]
+    public void Christmas_tree_fits_inside_its_canvas()
+    {
+        var bounds = OnSta(() =>
+        {
+            var tree = new ChristmasTree();
+            tree.Measure(new Size(ChristmasTree.DesignWidth, ChristmasTree.DesignHeight));
+            tree.Arrange(new Rect(0, 0, ChristmasTree.DesignWidth, ChristmasTree.DesignHeight));
+            return VisualTreeHelper.GetDescendantBounds(tree);
+        });
+        Assert.True(bounds.Left >= -4 && bounds.Right <= ChristmasTree.DesignWidth + 4, $"Horizontal bounds {bounds.Left:0}..{bounds.Right:0}");
+        Assert.True(bounds.Top >= -4 && bounds.Bottom <= ChristmasTree.DesignHeight + 4, $"Vertical bounds {bounds.Top:0}..{bounds.Bottom:0}");
     }
 }

@@ -154,6 +154,97 @@ public class TweakEngineTests
         Assert.False(Reg.KeyExists(Hive.HKCU, ScratchKey.Root + @"\never"));
     }
 
+    // ───────── Settings that were already on before VYTRIX
+
+    private static Tweak DefaultOn(ScratchKey k) => new()
+    {
+        Id = "test.defaulton." + Guid.NewGuid().ToString("N"), Name = "Default-on", Category = TweakCategory.Windows,
+        Description = "d", ExpectedEffect = "e", Explanation = "x",
+        // Windows default (value absent) is already 1 = on; 0 = off.
+        Ops = [RegOp.DWord(Hive.HKCU, k.Path, "Feature", 1, 1) with { OffValue = 0 }],
+    };
+
+    [Fact]
+    public void Setting_on_by_windows_default_is_detected_as_on()
+    {
+        using var k = new ScratchKey();
+        Reg.EnsureKey(Hive.HKCU, k.Path);   // value absent: Windows default = on
+        var t = DefaultOn(k);
+        Assert.Equal(TweakState.Applied, t.GetState());
+        Assert.False(t.AppliedByVytrix);
+        Assert.True(t.AlreadyOnInWindows);
+    }
+
+    [Fact]
+    public void Setting_turned_on_by_the_user_is_detected_as_on()
+    {
+        using var k = new ScratchKey();
+        Reg.Write(Hive.HKCU, k.Path, "Feature", 1, RegistryValueKind.DWord);
+        Assert.True(DefaultOn(k).AlreadyOnInWindows);
+    }
+
+    [Fact]
+    public async Task Turning_off_a_default_on_setting_really_turns_it_off()
+    {
+        using var k = new ScratchKey();
+        Reg.EnsureKey(Hive.HKCU, k.Path);
+        var t = DefaultOn(k);
+        var (ok, msg) = await TweakEngine.RevertAsync(t);
+        Assert.True(ok, msg);
+        Assert.Equal(0, Reg.Read(Hive.HKCU, k.Path, "Feature"));   // explicit off, not "restore default (= on)"
+        Assert.Equal(TweakState.NotApplied, t.GetState());
+    }
+
+    [Fact]
+    public async Task Setting_on_through_another_route_is_detected_and_turned_off_there()
+    {
+        using var k = new ScratchKey();
+        Reg.Write(Hive.HKCU, k.Path, "Alt", 0, RegistryValueKind.DWord);   // e.g. Windows Settings' own switch
+        var t = new Tweak
+        {
+            Id = "test.alt." + Guid.NewGuid().ToString("N"), Name = "Alt", Category = TweakCategory.Windows, Description = "d", ExpectedEffect = "e", Explanation = "x",
+            Ops = [RegOp.DWord(Hive.HKCU, k.Path, "Policy", 1, null)],
+            AlsoOnWhen = () => Reg.Read(Hive.HKCU, k.Path, "Alt") is 0,
+            AlsoOnSource = "test settings",
+            TurnOffElsewhere = () => TweakEngine.SetElsewhere(Hive.HKCU, k.Path, "Alt", 1, "test", "alt on"),
+        };
+        Assert.Equal(TweakState.Applied, t.GetState());     // on, though VYTRIX's own value is absent
+        Assert.True(t.AlreadyOnInWindows);
+        var (ok, msg) = await TweakEngine.RevertAsync(t);
+        Assert.True(ok, msg);
+        Assert.Equal(1, Reg.Read(Hive.HKCU, k.Path, "Alt"));
+        Assert.Equal(TweakState.NotApplied, t.GetState());
+    }
+
+    [Fact]
+    public async Task Revert_never_claims_success_while_still_on_elsewhere()
+    {
+        using var k = new ScratchKey();
+        Reg.Write(Hive.HKCU, k.Path, "Alt", 0, RegistryValueKind.DWord);
+        var t = new Tweak
+        {
+            Id = "test.alt2." + Guid.NewGuid().ToString("N"), Name = "Alt2", Category = TweakCategory.Windows, Description = "d", ExpectedEffect = "e", Explanation = "x",
+            Ops = [RegOp.DWord(Hive.HKCU, k.Path, "Policy", 1, null)],
+            AlsoOnWhen = () => Reg.Read(Hive.HKCU, k.Path, "Alt") is 0,
+            AlsoOnSource = "a policy VYTRIX does not change",
+        };
+        var (ok, msg) = await TweakEngine.RevertAsync(t);
+        Assert.False(ok);
+        Assert.Contains("still on", msg);
+        Assert.Contains("a policy VYTRIX does not change", msg);
+    }
+
+    [Fact]
+    public async Task Tweak_applied_by_vytrix_is_marked_as_such()
+    {
+        using var k = new ScratchKey();
+        var t = Synthetic(k);
+        await TweakEngine.ApplyAsync(t);
+        Assert.True(t.AppliedByVytrix);
+        Assert.False(t.AlreadyOnInWindows);
+        await TweakEngine.RevertAsync(t);
+    }
+
     [Fact]
     public void Journal_persists_to_disk_in_test_folder()
     {

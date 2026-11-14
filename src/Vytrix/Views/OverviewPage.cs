@@ -73,7 +73,7 @@ public sealed class OverviewPage : PageBase
         })));
 
         Body.Children.Add(BuildHero());
-        ThemeManager.Changed += () => _hero!.Visibility = ThemeManager.Current == ThemeManager.CherryBlossom ? Visibility.Visible : Visibility.Collapsed;
+        ThemeManager.Changed += () => { ApplyHeroTheme(); UpdateHeroAnimation(); };
         MainWindow.SceneAnimationChanged += _ => UpdateHeroAnimation();
         IsVisibleChanged += (_, _) => UpdateHeroAnimation();
 
@@ -141,54 +141,157 @@ public sealed class OverviewPage : PageBase
         _info["Windows"].ToolTip = $"{SystemInfo.OsName} {SystemInfo.OsVersion}, build {SystemInfo.OsBuild}";
     }
 
-    // ───────────────────────── Cherry Blossom hero
+    // ───────────────────────── Theme hero banner
 
     private Border? _hero;
-    private SakuraTree? _heroTree;
-    private readonly TextBlock _greeting = new() { Style = Ui.Style("H1"), FontSize = 28 };
+    private readonly ContentControl _heroArt = new() { Focusable = false, IsHitTestVisible = false };
+    private SakuraTree? _heroSakura;
+    private ChristmasTree? _heroXmas;
+    private Viewbox? _heroSakuraBox, _heroXmasBox;
+    private FrameworkElement? _heroGraphite;
+    private readonly TextBlock _heroBrand = new() { Style = Ui.Style("Label"), Margin = new Thickness(0, 0, 0, 10) };
+    private readonly TextBlock _greeting = new() { Style = Ui.Style("H1"), FontSize = 30 };
     private readonly TextBlock _heroStatus = new() { Style = Ui.Style("Dim"), FontSize = 14, Margin = new Thickness(0, 8, 0, 0), TextWrapping = TextWrapping.Wrap };
+    private readonly StackPanel _heroActions = new() { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 16, 0, 0) };
+    private string? _lastHealth;
 
     private Border BuildHero()
     {
-        _heroTree = new SakuraTree();
         var grid = new Grid();
-        // Tree on the right, bottom-anchored so its roots sit on the banner's edge.
-        grid.Children.Add(new Viewbox
-        {
-            Child = _heroTree, Stretch = Stretch.Uniform, Height = 270,
-            HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Bottom, Margin = new Thickness(0, 0, 36, -4),
-        });
-        var text = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(30, 0, 330, 0) };
-        var brand = new TextBlock { Text = "VYTRIX · CHERRY BLOSSOM", Style = Ui.Style("Label"), Foreground = Ui.Res("AccentHoverBrush"), Margin = new Thickness(0, 0, 0, 10) };
-        text.Children.Add(brand);
+        grid.Children.Add(_heroArt);
+        var text = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(32, 0, 340, 0) };
+        _heroBrand.Foreground = Ui.Res("AccentHoverBrush");
+        text.Children.Add(_heroBrand);
         text.Children.Add(_greeting);
         text.Children.Add(_heroStatus);
         text.Children.Add(new TextBlock
         {
             Text = $"{SystemInfo.OsName} {SystemInfo.OsVersion}  ·  {SystemInfo.Cpu.Brand}  ·  {SystemInfo.PrimaryGpu?.Name ?? "No GPU"}",
-            Style = Ui.Style("Muted"), Margin = new Thickness(0, 14, 0, 0), TextTrimming = TextTrimming.CharacterEllipsis, TextWrapping = TextWrapping.NoWrap,
+            Style = Ui.Style("Muted"), Margin = new Thickness(0, 12, 0, 0), TextTrimming = TextTrimming.CharacterEllipsis, TextWrapping = TextWrapping.NoWrap,
         });
+        text.Children.Add(_heroActions);
         grid.Children.Add(text);
-        var sky = new LinearGradientBrush(Color.FromArgb(0xF0, 0x2A, 0x16, 0x26), Color.FromArgb(0xF0, 0x16, 0x0D, 0x15), 90);
         _hero = new Border
         {
-            Height = 230, CornerRadius = new CornerRadius(14), ClipToBounds = true, Margin = new Thickness(0, 0, 0, 16),
-            Background = sky, BorderBrush = Ui.Res("BorderBrush"), BorderThickness = new Thickness(1), Child = grid,
-            Visibility = ThemeManager.Current == ThemeManager.CherryBlossom ? Visibility.Visible : Visibility.Collapsed,
+            Height = 248, CornerRadius = new CornerRadius(16), ClipToBounds = true, Margin = new Thickness(0, 0, 0, 18),
+            BorderBrush = Ui.Res("BorderStrongBrush"), BorderThickness = new Thickness(1), Child = grid,
         };
-        // Rounded clipping so the tree respects the banner's corners.
-        _hero.SizeChanged += (_, e) => _hero.Clip = new RectangleGeometry(new Rect(e.NewSize), 14, 14);
-        UpdateGreeting(null);
+        // Rounded clipping so the artwork respects the banner's corners.
+        _hero.SizeChanged += (_, e) => _hero.Clip = new RectangleGeometry(new Rect(e.NewSize), 16, 16);
+        CarolPlayer.Instance.StateChanged += () => Dispatcher.BeginInvoke(BuildHeroActions);
+        ApplyHeroTheme();
         return _hero;
     }
 
-    private void UpdateHeroAnimation() =>
-        _heroTree?.SetRunning(MainWindow.SceneAnimating && IsVisible && _hero?.Visibility == Visibility.Visible);
+    /// <summary>Swaps the banner's artwork, colours and copy for the active theme.</summary>
+    private void ApplyHeroTheme()
+    {
+        if (_hero is null) return;
+        var theme = ThemeManager.Current;
+        switch (theme)
+        {
+            case ThemeManager.Christmas:
+                _heroXmas ??= new ChristmasTree();
+                _heroXmasBox ??= new Viewbox
+                {
+                    Child = _heroXmas, Stretch = Stretch.Uniform, Height = 282,
+                    HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Bottom, Margin = new Thickness(0, 0, 44, -16),
+                };
+                _heroArt.Content = _heroXmasBox;
+                _hero.Background = new LinearGradientBrush
+                {
+                    StartPoint = new Point(0, 0), EndPoint = new Point(1, 1),
+                    GradientStops =
+                    {
+                        new GradientStop(Color.FromArgb(0xF4, 0x12, 0x2E, 0x24), 0),
+                        new GradientStop(Color.FromArgb(0xF4, 0x0A, 0x18, 0x14), 0.6),
+                        new GradientStop(Color.FromArgb(0xF4, 0x2A, 0x10, 0x14), 1),
+                    },
+                };
+                _heroBrand.Text = "VYTRIX  ·  CHRISTMAS EDITION";
+                break;
+            case ThemeManager.CherryBlossom:
+                _heroSakura ??= new SakuraTree();
+                _heroSakuraBox ??= new Viewbox
+                {
+                    Child = _heroSakura, Stretch = Stretch.Uniform, Height = 285,
+                    HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Bottom, Margin = new Thickness(0, 0, 36, -4),
+                };
+                _heroArt.Content = _heroSakuraBox;
+                _hero.Background = new LinearGradientBrush(Color.FromArgb(0xF0, 0x2A, 0x16, 0x26), Color.FromArgb(0xF0, 0x16, 0x0D, 0x15), 90);
+                _heroBrand.Text = "VYTRIX  ·  CHERRY BLOSSOM";
+                break;
+            default:
+                _heroGraphite ??= BuildGraphiteArt();
+                _heroArt.Content = _heroGraphite;
+                _hero.Background = new LinearGradientBrush(Color.FromRgb(0x17, 0x15, 0x22), Color.FromRgb(0x0D, 0x0D, 0x11), 25);
+                _heroBrand.Text = "VYTRIX  ·  PRECISION PERFORMANCE";
+                break;
+        }
+        UpdateGreeting(_lastHealth);
+        BuildHeroActions();
+    }
+
+    /// <summary>Graphite artwork: a large, softly glowing logo mark.</summary>
+    private static FrameworkElement BuildGraphiteArt()
+    {
+        var g = new Grid { HorizontalAlignment = HorizontalAlignment.Right, Width = 360 };
+        g.Children.Add(new System.Windows.Shapes.Ellipse
+        {
+            Width = 320, Height = 320, Margin = new Thickness(0, -40, -60, 0),
+            Fill = new RadialGradientBrush(Color.FromArgb(0x55, 0x8B, 0x5C, 0xF6), Color.FromArgb(0x00, 0x8B, 0x5C, 0xF6)),
+        });
+        var mark = new System.Windows.Shapes.Path { Data = Ui.Icon("LogoMark"), Stretch = Stretch.Uniform, Width = 150, Height = 130, Opacity = 0.9 };
+        mark.SetResourceReference(System.Windows.Shapes.Shape.FillProperty, "LogoBrush");
+        g.Children.Add(mark);
+        return g;
+    }
+
+    private void BuildHeroActions()
+    {
+        _heroActions.Children.Clear();
+        if (ThemeManager.Current == ThemeManager.Christmas)
+        {
+            var player = CarolPlayer.Instance;
+            var play = Ui.IconButton(player.IsPlaying ? "IcoPause" : "IcoMusic", player.IsPlaying ? "Pause carols" : "Play carols", "Primary");
+            play.ToolTip = "Music-box arrangements of public-domain carols, synthesized by VYTRIX on your PC.";
+            play.Click += async (_, _) => await player.ToggleAsync();
+            _heroActions.Children.Add(play);
+            if (player.IsPlaying || player.IsPreparing)
+            {
+                var now = new TextBlock { Text = player.IsPreparing ? "Preparing carols…" : $"♪  {player.CurrentTitle}", Style = Ui.Style("Dim"), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(14, 0, 0, 0) };
+                _heroActions.Children.Add(now);
+                if (player.IsPlaying)
+                {
+                    var next = new Button { Content = "Next", Style = Ui.Style("Ghost"), Margin = new Thickness(12, 0, 0, 0), Padding = new Thickness(12, 5, 12, 5) };
+                    next.Click += (_, _) => player.Next();
+                    _heroActions.Children.Add(next);
+                }
+            }
+        }
+    }
+
+    private void UpdateHeroAnimation()
+    {
+        bool run = MainWindow.SceneAnimating && IsVisible;
+        _heroSakura?.SetRunning(run && ThemeManager.Current == ThemeManager.CherryBlossom);
+        _heroXmas?.SetRunning(run && ThemeManager.Current == ThemeManager.Christmas);
+    }
 
     private void UpdateGreeting(string? health)
     {
-        var h = DateTime.Now.Hour;
-        _greeting.Text = h < 5 ? "Good night" : h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening";
+        _lastHealth = health;
+        var now = DateTime.Now;
+        var h = now.Hour;
+        string greeting = h < 5 ? "Good night" : h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening";
+        if (ThemeManager.Current == ThemeManager.Christmas)
+        {
+            var christmas = new DateTime(now.Month == 12 && now.Day > 26 ? now.Year + 1 : now.Year, 12, 25);
+            int days = (christmas.Date - now.Date).Days;
+            greeting = now.Month == 12 && now.Day == 25 ? "Merry Christmas" : now.Month == 12 && now.Day == 24 ? "Happy Christmas Eve"
+                : now.Month == 12 && now.Day == 26 ? "Happy Boxing Day" : days <= 60 ? $"{days} days until Christmas" : "Season's greetings";
+        }
+        _greeting.Text = greeting;
         _heroStatus.Text = health ?? "Checking your system…";
     }
 

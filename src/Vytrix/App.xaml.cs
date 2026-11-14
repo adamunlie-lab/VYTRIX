@@ -15,15 +15,35 @@ public partial class App : Application
 
     protected override void OnStartup(StartupEventArgs e)
     {
-        // Developer aid: "--render-tree out.png" renders the Cherry Blossom tree to an image and exits.
+        // Developer aid: "--dump-tweak-states out.txt" writes every tweak's detected state (read-only) and exits.
+        int ds = Array.IndexOf(e.Args, "--dump-tweak-states");
+        if (ds >= 0 && ds + 1 < e.Args.Length)
+        {
+            VxNative.vx_init();
+            SystemInfo.LoadNative();
+            var lines = TweakCatalog.All.Select(t =>
+            {
+                var st = t.GetState();
+                var how = st != TweakState.Applied ? "" : t.AppliedByVytrix ? "  [applied by VYTRIX]" : t.IsOnElsewhere() ? $"  [already on via {t.AlsoOnSource}]" : "  [already on in Windows]";
+                return $"{st,-12} {t.ComponentLabel,-18} {t.Name}{how}";
+            });
+            File.WriteAllLines(e.Args[ds + 1], lines);
+            Shutdown();
+            return;
+        }
+        // Developer aid: "--render-tree out.png" / "--render-christmas out.png" render a theme's scene to an image and exit.
         int rt = Array.IndexOf(e.Args, "--render-tree");
+        int rc = Array.IndexOf(e.Args, "--render-christmas");
+        if (rc >= 0) rt = rc;
         if (rt >= 0 && rt + 1 < e.Args.Length)
         {
-            var tree = new SakuraTree();
-            var frame = new System.Windows.Controls.Border { Background = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0x14, 0x0D, 0x13)), Child = tree };
-            frame.Measure(new Size(SakuraTree.DesignWidth, SakuraTree.DesignHeight));
-            frame.Arrange(new Rect(0, 0, SakuraTree.DesignWidth, SakuraTree.DesignHeight));
-            var bmp = new System.Windows.Media.Imaging.RenderTargetBitmap((int)SakuraTree.DesignWidth, (int)SakuraTree.DesignHeight, 96, 96, System.Windows.Media.PixelFormats.Pbgra32);
+            System.Windows.FrameworkElement tree = rc >= 0 ? new ChristmasTree() : new SakuraTree();
+            double w = rc >= 0 ? ChristmasTree.DesignWidth : SakuraTree.DesignWidth, h = rc >= 0 ? ChristmasTree.DesignHeight : SakuraTree.DesignHeight;
+            var bg = rc >= 0 ? System.Windows.Media.Color.FromRgb(0x09, 0x12, 0x10) : System.Windows.Media.Color.FromRgb(0x14, 0x0D, 0x13);
+            var frame = new System.Windows.Controls.Border { Background = new System.Windows.Media.SolidColorBrush(bg), Child = tree };
+            frame.Measure(new Size(w, h));
+            frame.Arrange(new Rect(0, 0, w, h));
+            var bmp = new System.Windows.Media.Imaging.RenderTargetBitmap((int)w, (int)h, 96, 96, System.Windows.Media.PixelFormats.Pbgra32);
             bmp.Render(frame);
             var enc = new System.Windows.Media.Imaging.PngBitmapEncoder();
             enc.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(bmp));
@@ -75,6 +95,15 @@ public partial class App : Application
         {
             Settings.Current.Theme = ThemeManager.CherryBlossom;
             Settings.Current.Accent = "Sakura";
+            Settings.Current.CherryBlossomIntroduced = true;
+            Settings.Save();
+        }
+        // The Christmas edition switches existing installs to the Christmas theme once (Settings can switch back).
+        if (!Settings.Current.ChristmasIntroduced)
+        {
+            Settings.Current.Theme = ThemeManager.Christmas;
+            Settings.Current.Accent = ThemeManager.DefaultAccent(ThemeManager.Christmas);
+            Settings.Current.ChristmasIntroduced = true;
             Settings.Current.CherryBlossomIntroduced = true;
             Settings.Save();
         }

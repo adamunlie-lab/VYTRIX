@@ -87,6 +87,10 @@
     <Geometry x:Key="IcoProfile">M4,5 H20 M4,12 H20 M4,19 H20 M8,3 V7 M16,10 V14 M11,17 V21</Geometry>
     <Geometry x:Key="IcoMouse">M12,3 A6,6 0 0 1 18,9 V15 A6,6 0 0 1 6,15 V9 A6,6 0 0 1 12,3 Z M12,6.5 V10</Geometry>
     <Geometry x:Key="IcoDisplay">M3,4.5 H21 V16 H3 Z M8.5,20 H15.5 M12,16 V20</Geometry>
+    <Geometry x:Key="IcoMusic">M5,18 A2.6,2.6 0 1 0 10.2,18 A2.6,2.6 0 1 0 5,18 M10.2,18 V5.5 L20,3.5 V15.5 M14.8,15.5 A2.6,2.6 0 1 0 20,15.5 A2.6,2.6 0 1 0 14.8,15.5 M10.2,9 L20,7</Geometry>
+    <Geometry x:Key="IcoPause">M8.5,5 V19 M15.5,5 V19</Geometry>
+    <Geometry x:Key="IcoNext">M6,5.5 L14.5,12 L6,18.5 Z M18,5.5 V18.5</Geometry>
+    <Geometry x:Key="IcoPalette">M12,3 A9,9 0 1 0 12,21 C13.4,21 14,20.2 14,19.2 C14,18 13,17.6 13,16.5 C13,15.4 13.9,14.6 15,14.6 H17 A4,4 0 0 0 21,10.6 C21,6.4 17,3 12,3 Z M7.5,11 L7.5,11.1 M10,7.5 L10,7.6 M14.5,7.5 L14.5,7.6</Geometry>
     <Geometry x:Key="LogoMark">M3,4 L12,21 L21,4 L16.6,4 L12,13 L7.4,4 Z</Geometry>
 
     <!-- Icon presenter -->
@@ -147,8 +151,14 @@
         <Setter Property="Background" Value="{StaticResource SurfaceBrush}"/>
         <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}"/>
         <Setter Property="BorderThickness" Value="1"/>
-        <Setter Property="CornerRadius" Value="10"/>
+        <Setter Property="CornerRadius" Value="12"/>
         <Setter Property="Padding" Value="18"/>
+        <Style.Triggers>
+            <!-- Subtle response on hover: the edge brightens, like light catching glass. -->
+            <Trigger Property="IsMouseOver" Value="True">
+                <Setter Property="BorderBrush" Value="{StaticResource BorderStrongBrush}"/>
+            </Trigger>
+        </Style.Triggers>
     </Style>
     <Style x:Key="Inset" TargetType="Border">
         <Setter Property="Background" Value="{StaticResource Surface2Brush}"/>
@@ -204,9 +214,41 @@
     <Style TargetType="Button" BasedOn="{StaticResource ButtonBase}"/>
     <Style x:Key="Primary" TargetType="Button" BasedOn="{StaticResource ButtonBase}">
         <Setter Property="Background" Value="{DynamicResource AccentBrush}"/>
-        <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource AccentHoverBrush}"/>
         <Setter Property="Foreground" Value="White"/>
         <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Grid SnapsToDevicePixels="True">
+                        <Border x:Name="b" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="1" CornerRadius="8"/>
+                        <!-- Glossy top highlight -->
+                        <Border x:Name="gloss" CornerRadius="8" Margin="1" Opacity="0.55">
+                            <Border.Background>
+                                <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                    <GradientStop Color="#2EFFFFFF" Offset="0"/>
+                                    <GradientStop Color="#08FFFFFF" Offset="0.5"/>
+                                    <GradientStop Color="#00FFFFFF" Offset="1"/>
+                                </LinearGradientBrush>
+                            </Border.Background>
+                        </Border>
+                        <ContentPresenter Margin="{TemplateBinding Padding}" HorizontalAlignment="Center" VerticalAlignment="Center" TextElement.Foreground="{TemplateBinding Foreground}"/>
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="gloss" Property="Opacity" Value="1"/>
+                            <Setter TargetName="b" Property="Background" Value="{DynamicResource AccentHoverBrush}"/>
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="gloss" Property="Opacity" Value="0.2"/>
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Opacity" Value="0.4"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
     </Style>
     <Style x:Key="Ghost" TargetType="Button" BasedOn="{StaticResource ButtonBase}">
         <Setter Property="Background" Value="Transparent"/>

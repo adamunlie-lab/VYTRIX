@@ -189,11 +189,39 @@ public static class ThemeManager
         ("Amber", Color.FromRgb(0xF5, 0x9E, 0x0B), Color.FromRgb(0xFB, 0xBF, 0x24)),
         ("Rose", Color.FromRgb(0xF4, 0x3F, 0x5E), Color.FromRgb(0xFB, 0x71, 0x85)),
         ("Sakura", Color.FromRgb(0xDB, 0x27, 0x77), Color.FromRgb(0xF4, 0x72, 0xB6)),
+        ("Crimson", Color.FromRgb(0xC8, 0x10, 0x2E), Color.FromRgb(0xE6, 0x39, 0x46)),
     ];
 
+    public const string Christmas = "Christmas";
     public const string CherryBlossom = "Cherry Blossom";
     public const string Graphite = "Graphite";
-    public static readonly string[] Themes = [CherryBlossom, Graphite];
+    public static readonly string[] Themes = [Christmas, CherryBlossom, Graphite];
+
+    /// <summary>The signature accent each theme switches to when selected.</summary>
+    public static string DefaultAccent(string theme) => theme switch { Christmas => "Crimson", CherryBlossom => "Sakura", _ => "Violet" };
+
+    // Midnight-pine palette: deep evergreen surfaces, warm snow-white text, crimson and gold accents.
+    private static readonly Dictionary<string, Color> ChristmasPalette = new()
+    {
+        ["BgBrush"] = Color.FromRgb(0x09, 0x12, 0x10),
+        ["SidebarBrush"] = Color.FromRgb(0x0B, 0x16, 0x13),
+        ["SurfaceBrush"] = Color.FromArgb(0xEE, 0x0F, 0x1D, 0x19),
+        ["Surface2Brush"] = Color.FromArgb(0xF2, 0x13, 0x25, 0x20),
+        ["Surface3Brush"] = Color.FromRgb(0x1A, 0x30, 0x29),
+        ["BorderBrush"] = Color.FromRgb(0x22, 0x39, 0x30),
+        ["BorderStrongBrush"] = Color.FromRgb(0x2F, 0x4B, 0x3F),
+        ["TextBrush"] = Color.FromRgb(0xF6, 0xF2, 0xE9),
+        ["TextDimBrush"] = Color.FromRgb(0xC4, 0xCF, 0xC7),
+        ["TextMutedBrush"] = Color.FromRgb(0x7E, 0x93, 0x88),
+        ["GoodBrush"] = Color.FromRgb(0x6E, 0xE7, 0xB7),
+        ["WarnBrush"] = Color.FromRgb(0xF4, 0xC9, 0x5D),
+        ["BadBrush"] = Color.FromRgb(0xFF, 0x6B, 0x6B),
+        ["GoodSoftBrush"] = Color.FromArgb(0x1F, 0x6E, 0xE7, 0xB7),
+        ["WarnSoftBrush"] = Color.FromArgb(0x1F, 0xF4, 0xC9, 0x5D),
+        ["BadSoftBrush"] = Color.FromArgb(0x1F, 0xFF, 0x6B, 0x6B),
+        ["Accent2Brush"] = Color.FromRgb(0xF4, 0xC9, 0x5D),
+    };
+    private static readonly Color[] ChristmasLogo = [Color.FromRgb(0xFF, 0xF1, 0xC1), Color.FromRgb(0xE9, 0xC4, 0x6A), Color.FromRgb(0xC8, 0x10, 0x2E)];
     public static string Current { get; private set; } = Graphite;
     public static event Action? Changed;
 
@@ -237,15 +265,15 @@ public static class ThemeManager
         var logo = (LinearGradientBrush)res["LogoBrush"];
         _graphiteLogo ??= logo.GradientStops.Select(s => s.Color).ToArray();
 
-        bool sakura = name == CherryBlossom;
-        var map = sakura ? SakuraPalette : _graphite;
+        if (!Themes.Contains(name)) name = Christmas;
+        var map = name switch { CherryBlossom => SakuraPalette, Christmas => ChristmasPalette, _ => _graphite };
         foreach (var (key, color) in map) SetColor(res, key, color);
         // Gradient stops from XAML are read-only, so the logo brush is replaced (consumers use DynamicResource).
-        var stops = sakura ? SakuraLogo : _graphiteLogo;
+        var stops = name switch { CherryBlossom => SakuraLogo, Christmas => ChristmasLogo, _ => _graphiteLogo };
         var newLogo = new LinearGradientBrush { StartPoint = logo.StartPoint, EndPoint = logo.EndPoint };
         for (int i = 0; i < stops.Length; i++) newLogo.GradientStops.Add(new GradientStop(stops[i], stops.Length == 1 ? 0 : i / (double)(stops.Length - 1)));
         res["LogoBrush"] = newLogo;
-        Current = sakura ? CherryBlossom : Graphite;
+        Current = name;
         Changed?.Invoke();
     }
 

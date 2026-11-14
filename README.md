@@ -59,7 +59,7 @@ src/Vytrix/
                             ThemeManager, UI kit
   Views/                    one class per page
   Themes/Theme.xaml         palette, typography, custom icon set, control styles
-tests/Vytrix.Tests/         xUnit tests (88, incl. 13 admin)
+tests/Vytrix.Tests/         xUnit tests (109, incl. 13 admin)
 legal/TERMS.txt             Terms of Agreement (embedded in the app and shown by the installer)
 tools/                      icon generator, screenshot + UI-automation QA scripts
 installer/vytrix.iss        Inno Setup script
@@ -115,7 +115,26 @@ These terms were drafted for this project and are not legal advice. Have a lawye
 - **Installed Apps:** search and sort, and opens each app's own uninstaller (never silent).
 - **Services:** every service, classified Protected / Optional / Caution. Startup-type changes are journaled.
 - **Benchmark:** the Windows System Assessment Tool (`winsat`) for disk sequential/random, memory bandwidth, CPU encryption and a full assessment with scores.
-- **Themes:** **Cherry Blossom** (default) or **Graphite**, switchable live in Settings.
+- **Christmas edition (default theme):** a midnight-pine palette with crimson and gold.
+  - The Overview hero shows a decorated tree drawn in code (`Controls/Christmas.cs`): tiered boughs with snow, a gold garland, ornaments, three banks of fairy lights that twinkle out of phase, a glowing star and presents.
+  - Snow drifts across the window, and the hero shows a days-until-Christmas greeting.
+- **Carols:** music-box arrangements of five public-domain carols, *synthesized by VYTRIX on your PC* (`Services/Carols.cs`). No downloads, no recordings, no licensing questions.
+  - The carols are Jingle Bells (1857), We Wish You a Merry Christmas (traditional), Deck the Halls (traditional), Silent Night (1818) and Joy to the World (1839).
+  - The first press of **Play carols** renders them to small WAV files in about 3 seconds.
+  - Music never starts on its own, pauses while VYTRIX is minimised and stops when it closes. There's a volume control in Settings.
+- **Polish:**
+  - a branded splash that waits for the first live reading;
+  - a title-bar theme switcher and music controls;
+  - glossy primary buttons, cards that respond on hover, sliding toasts with a coloured edge, and a deep scrim behind dialogs.
+- **Settings already on are shown as on.** VYTRIX reads the real state of every tweak. If you (or Windows) already turned a setting on, the tweak shows **Already on**, separate from **Applied by VYTRIX**, with a tooltip saying where it's set. This covers:
+  - **Windows defaults** that are already on (Game Mode, background recording off on Windows 11);
+  - **driver defaults** (HAGS on newer GPU drivers);
+  - **settings stored in a second place** by Windows Settings (Bing web search, diagnostic data, Delivery Optimization);
+  - **Group Policies**;
+  - **settings that are off because of another setting** (Fast Startup is off when hibernation is disabled).
+
+  Turning such a tweak off really turns it off. If it's controlled somewhere VYTRIX shouldn't change, such as a policy, VYTRIX says exactly where instead of claiming success.
+- **Themes:** **Christmas** (default), **Cherry Blossom** or **Graphite**, switchable live from the title bar or Settings.
   - Cherry Blossom is a night-sakura palette.
   - The Overview has a hero banner with a procedurally generated cherry tree whose limbs sway in the wind, with smaller branches riding on bigger ones (`Controls/Sakura.cs`). The same tree stands behind every other page.
   - Petals drift across the window. You can turn them off.
@@ -140,7 +159,8 @@ This builds at that version, runs the tests, compiles the installer, computes th
 ## Testing
 
 ```powershell
-dotnet test tests\Vytrix.Tests\Vytrix.Tests.csproj     # 88 automated tests (admin ones skip unless elevated)
+dotnet test tests\Vytrix.Tests\Vytrix.Tests.csproj     # 109 automated tests (admin ones skip unless elevated)
+powershell -File tools\qa-music.ps1                     # carols: render, play (15% volume), pause, CPU
 powershell -File tools\qa-motion.ps1                    # proves the tree animates; CPU active vs minimised
 powershell -File tools\qa-theme-switch.ps1              # live theme switching via Settings
 powershell -File tools\admin-qa.ps1                     # elevated QA: full suite as admin + admin UI checks (UAC prompt)

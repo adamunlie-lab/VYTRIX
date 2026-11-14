@@ -16,7 +16,7 @@
         </Grid.ColumnDefinitions>
 
         <!-- ═══════ Sidebar ═══════ -->
-        <Border Background="{StaticResource SidebarBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,1,0">
+        <Border x:Name="SidebarRoot" Background="{StaticResource SidebarBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,1,0">
             <DockPanel>
                 <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="22,20,0,22">
                     <Border Width="34" Height="34" CornerRadius="9" Background="{StaticResource Surface2Brush}" BorderBrush="{StaticResource BorderStrongBrush}" BorderThickness="1">
@@ -46,7 +46,7 @@
         </Border>
 
         <!-- ═══════ Content ═══════ -->
-        <Grid Grid.Column="1">
+        <Grid x:Name="ContentRoot" Grid.Column="1">
             <Grid.RowDefinitions>
                 <RowDefinition Height="46"/>
                 <RowDefinition/>
@@ -72,6 +72,7 @@
                     </Popup>
                 </Grid>
                 <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Top">
+                    <StackPanel x:Name="TitleTools" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,8,12,0" WindowChrome.IsHitTestVisibleInChrome="True"/>
                     <Button Style="{StaticResource ChromeButton}" Click="Min_Click" ToolTip="Minimise">
                         <Path Data="{StaticResource IcoMin}" Style="{StaticResource Icon}" Width="11" Height="11"/>
                     </Button>
@@ -89,7 +90,7 @@
 
         <!-- ═══════ Overlays ═══════ -->
         <Grid x:Name="PetalHost" Grid.ColumnSpan="2" IsHitTestVisible="False" Opacity="0.8"/>
-        <Grid x:Name="DialogLayer" Grid.ColumnSpan="2" Visibility="Collapsed" Background="#B3050507">
+        <Grid x:Name="DialogLayer" Grid.ColumnSpan="2" Visibility="Collapsed" Background="#D6040606">
             <Border x:Name="DialogCard" Style="{StaticResource Card}" Background="{StaticResource Surface2Brush}" BorderBrush="{StaticResource BorderStrongBrush}"
                     MaxWidth="560" MinWidth="420" HorizontalAlignment="Center" VerticalAlignment="Center" Padding="24">
                 <Border.Effect>
@@ -110,5 +111,32 @@
         </Grid>
 
         <StackPanel x:Name="ToastLayer" Grid.ColumnSpan="2" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,24,24" Width="380"/>
+
+        <!-- ═══════ Branded splash (fades out once the first live reading arrives) ═══════ -->
+        <Grid x:Name="Splash" Grid.ColumnSpan="2" Background="{StaticResource BgBrush}">
+            <Ellipse Width="520" Height="520" IsHitTestVisible="False">
+                <Ellipse.Fill>
+                    <RadialGradientBrush>
+                        <GradientStop Color="#33FFFFFF" Offset="0"/>
+                        <GradientStop Color="#00FFFFFF" Offset="1"/>
+                    </RadialGradientBrush>
+                </Ellipse.Fill>
+            </Ellipse>
+            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                <Border x:Name="SplashMark" Width="92" Height="92" CornerRadius="24" Background="{StaticResource Surface2Brush}" BorderBrush="{StaticResource BorderStrongBrush}" BorderThickness="1" HorizontalAlignment="Center">
+                    <Border.Effect>
+                        <DropShadowEffect BlurRadius="40" ShadowDepth="0" Opacity="0.55" Color="Black"/>
+                    </Border.Effect>
+                    <Path Data="{StaticResource LogoMark}" Fill="{DynamicResource LogoBrush}" Stretch="Uniform" Width="48" Height="42" Margin="0,6,0,0"/>
+                </Border>
+                <StackPanel x:Name="SplashWordmark" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,26,0,0"/>
+                <TextBlock Text="Precision Performance. Zero Compromise." HorizontalAlignment="Center" Margin="0,10,0,0" Foreground="{StaticResource TextMutedBrush}" FontSize="13"/>
+                <Border Width="180" Height="2" CornerRadius="1" Background="{StaticResource Surface3Brush}" Margin="0,30,0,0" ClipToBounds="True">
+                    <Border x:Name="SplashBar" Width="60" Height="2" CornerRadius="1" Background="{DynamicResource AccentBrush}" HorizontalAlignment="Left">
+                        <Border.RenderTransform><TranslateTransform x:Name="SplashBarMove" X="-60"/></Border.RenderTransform>
+                    </Border>
+                </Border>
+            </StackPanel>
+        </Grid>
     </Grid>
 </Window>

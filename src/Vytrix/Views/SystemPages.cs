@@ -377,6 +377,14 @@ public sealed class SettingsPage : PageBase
     public override string PageSubtitle => "Appearance, safety behaviour, updates and data.";
 
     private readonly List<RadioButton> _accentChips = [];
+    private readonly List<RadioButton> _themeChips = [];
+
+    // Keep the chips in sync when the theme is changed from the title bar.
+    public override void OnShown()
+    {
+        foreach (var c in _themeChips) c.IsChecked = (string)c.Content == ThemeManager.Current;
+        foreach (var a in _accentChips) a.IsChecked = (string)a.Tag == Settings.Current.Accent;
+    }
 
     protected override void Build()
     {
@@ -389,12 +397,19 @@ public sealed class SettingsPage : PageBase
         foreach (var th in ThemeManager.Themes)
         {
             var rb = new RadioButton { Content = th, Style = Ui.Style("Chip"), GroupName = "theme", IsChecked = s.Theme == th,
-                ToolTip = th == ThemeManager.CherryBlossom ? "Night sakura palette with a swaying cherry tree and falling petals." : "The original graphite and violet look, no scenery." };
+                ToolTip = th switch
+                {
+                    ThemeManager.Christmas => "Midnight pine palette, a twinkling Christmas tree, snowfall and optional carols.",
+                    ThemeManager.CherryBlossom => "Night sakura palette with a swaying cherry tree and falling petals.",
+                    _ => "The original graphite and violet look, no scenery.",
+                } };
+            _themeChips.Add(rb);
             var name = th;
             rb.Checked += (_, _) =>
             {
+                if (s.Theme == name && ThemeManager.Current == name) return;
                 s.Theme = name;
-                s.Accent = name == ThemeManager.CherryBlossom ? "Sakura" : "Violet";   // each theme's signature accent
+                s.Accent = ThemeManager.DefaultAccent(name);   // each theme's signature accent
                 ThemeManager.ApplyTheme(name);
                 ThemeManager.Apply(s.Accent);
                 foreach (var a in _accentChips) a.IsChecked = (string)a.Tag == s.Accent;
@@ -418,7 +433,17 @@ public sealed class SettingsPage : PageBase
             accents.Children.Add(rb);
         }
         look.Children.Add(accents);
-        look.Children.Add(Option("Falling petals", "Cherry Blossom theme: petals drift across the window.", s.ShowFallingPetals, v => s.ShowFallingPetals = v));
+        look.Children.Add(Option("Falling petals & snow", "Petals (Cherry Blossom) or snow (Christmas) drift across the window.", s.ShowFallingPetals, v => s.ShowFallingPetals = v));
+        look.Children.Add(new TextBlock { Text = "CAROL VOLUME", Style = Ui.Style("Label"), Margin = new Thickness(0, 14, 0, 6) });
+        var vol = new ComboBox { Width = 200, HorizontalAlignment = HorizontalAlignment.Left, ToolTip = "Music-box carols in the Christmas theme. They never start on their own." };
+        foreach (var pct in new[] { 25, 40, 55, 70, 85, 100 })
+        {
+            vol.Items.Add(new ComboBoxItem { Content = $"{pct}%", Tag = pct / 100.0 });
+            if (Math.Abs(s.MusicVolume - pct / 100.0) < 0.01) vol.SelectedIndex = vol.Items.Count - 1;
+        }
+        if (vol.SelectedIndex < 0) vol.SelectedIndex = 2;
+        vol.SelectionChanged += (_, _) => { CarolPlayer.Instance.SetVolume((double)((ComboBoxItem)vol.SelectedItem).Tag); Settings.Save(); };
+        look.Children.Add(vol);
         look.Children.Add(Option("Reduce motion", "Turns off page and dialog animations, and holds the cherry tree still.", s.ReduceMotion, v => s.ReduceMotion = v));
         look.Children.Add(new TextBlock { Text = "LIVE MONITORING INTERVAL", Style = Ui.Style("Label"), Margin = new Thickness(0, 14, 0, 6) });
         var interval = new ComboBox { Width = 200, HorizontalAlignment = HorizontalAlignment.Left };

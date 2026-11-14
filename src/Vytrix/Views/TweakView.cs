@@ -111,8 +111,19 @@ public sealed class TweakView : Border
         _toggle.IsEnabled = s != TweakState.Unsupported;
         _toggle.ToolTip = s == TweakState.Unsupported ? Tweak.UnsupportedReason : (Tweak.RequiresAdmin && !Elevation.IsAdmin ? "Requires administrator mode" : null);
         _syncing = false;
-        _stateBadge.Content = Kit.StateBadge(s);
-        if (s == TweakState.Unsupported) _stateBadge.ToolTip = Tweak.UnsupportedReason;
+        if (s == TweakState.Applied)
+        {
+            bool byUs = Tweak.AppliedByVytrix;
+            var badge = byUs ? Ui.Badge("Applied by VYTRIX", "AccentHoverBrush", "AccentSoftBrush") : Ui.Badge("Already on", "GoodBrush", "GoodSoftBrush");
+            badge.ToolTip = byUs
+                ? "VYTRIX turned this on. Turning it off restores your previous value."
+                : Tweak.IsOnElsewhere() && Tweak.AlsoOnSource is { } src
+                    ? $"This was already on before VYTRIX, through {src}."
+                    : "This was already on before VYTRIX, through Windows Settings or Windows' default. VYTRIX left it as it was.";
+            _stateBadge.Content = badge;
+        }
+        else _stateBadge.Content = Kit.StateBadge(s);
+        _stateBadge.ToolTip = s == TweakState.Unsupported ? Tweak.UnsupportedReason : null;
     }
 
     private async Task OnToggle(bool on)

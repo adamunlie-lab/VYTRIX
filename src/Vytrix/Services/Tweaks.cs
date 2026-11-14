@@ -34,6 +34,16 @@ public static class Components
 /// <summary>One registry write performed by a tweak, with the value Windows ships with.</summary>
 public sealed record RegOp(Hive Hive, string Path, string? Name, object? Value, RegistryValueKind Kind, object? WindowsDefault = null, bool KeyOnly = false)
 {
+    /// <summary>
+    /// The value that means "off". Needed when Windows' default already equals the tweak's
+    /// value (e.g. Game Mode is on by default): turning the tweak off must write this
+    /// explicitly, because restoring "default" would leave it on.
+    /// </summary>
+    public object? OffValue { get; init; }
+
+    /// <summary>When the value is absent, Windows behaves as if it were set to WindowsDefault.</summary>
+    public bool MissingMeansDefault => WindowsDefault is not null;
+
     public static RegOp DWord(Hive h, string path, string name, int value, int? windowsDefault) => new(h, path, name, value, RegistryValueKind.DWord, windowsDefault);
     public static RegOp Str(Hive h, string path, string name, string value, string? windowsDefault) => new(h, path, name, value, RegistryValueKind.String, windowsDefault);
     public static RegOp Key(Hive h, string path) => new(h, path, null, null, RegistryValueKind.Unknown, null, true);
@@ -43,12 +53,19 @@ public sealed record RegOp(Hive Hive, string Path, string? Name, object? Value, 
     {
         if (KeyOnly) return Reg.KeyExists(Hive, Path);
         var cur = Reg.Read(Hive, Path, Name);
-        if (cur is null) return false;
+        // An absent value behaves like Windows' default; if that default IS the tweak's value, it's on.
+        if (cur is null) return MissingMeansDefault && ValueEquals(WindowsDefault, Value);
+        return ValueEquals(cur, Value);
+    }
+
+    private bool ValueEquals(object? cur, object? want)
+    {
+        if (cur is null || want is null) return false;
         return Kind switch
         {
-            RegistryValueKind.DWord => cur is int i && i == (int)Value!,
-            RegistryValueKind.String => cur is string s && string.Equals(s, (string)Value!, StringComparison.OrdinalIgnoreCase),
-            _ => Equals(cur, Value),
+            RegistryValueKind.DWord => cur is int i && want is int w && i == w,
+            RegistryValueKind.String => cur is string s && want is string ws && string.Equals(s, ws, StringComparison.OrdinalIgnoreCase),
+            _ => Equals(cur, want),
         };
     }
 
@@ -79,6 +96,22 @@ public sealed class Tweak
     /// <summary>Exact description of what a custom (non-Ops) tweak changes.</summary>
     public string? ChangesText { get; init; }
 
+    /// <summary>
+    /// Detects the same setting turned on through another documented route (Windows Settings,
+    /// Group Policy, the driver's default), so a setting the user already enabled shows as on.
+    /// </summary>
+    public Func<bool>? AlsoOnWhen { get; init; }
+    /// <summary>Where that other route lives, shown to the user (e.g. "Windows Settings → …").</summary>
+    public string? AlsoOnSource { get; init; }
+    /// <summary>Turns the setting off at that other route (journaled), if it is safe to do so.</summary>
+    public Func<Task<(bool, string)>>? TurnOffElsewhere { get; init; }
+
+    /// <summary>True when VYTRIX itself applied this tweak (an open journal record exists).</summary>
+    public bool AppliedByVytrix => Journal.ActiveFor(ChangeKind.Tweak, Id) is not null;
+
+    /// <summary>On, but not because of VYTRIX: the user (or Windows) already had it enabled.</summary>
+    public bool AlreadyOnInWindows => GetState() == TweakState.Applied && !AppliedByVytrix;
+
     public TweakComponent Component => TweakCatalog.ComponentOf(Id);
     public string ComponentLabel => Components.Label(Component);
     public string CategoryLabel => Category == TweakCategory.VisualEffects ? "Visual effects" : Category.ToString();
@@ -99,13 +132,25 @@ public sealed class Tweak
     public TweakState GetState()
     {
         if (UnsupportedReason is not null) return TweakState.Unsupported;
+        TweakState state;
         if (CustomState is not null)
         {
             var s = CustomState();
-            return s is null ? TweakState.Unsupported : s.Value ? TweakState.Applied : TweakState.NotApplied;
+            if (s is null) return TweakState.Unsupported;
+            state = s.Value ? TweakState.Applied : TweakState.NotApplied;
         }
-        int matched = Ops.Count(o => { try { return o.Matches(); } catch { return false; } });
-        return matched == Ops.Count ? TweakState.Applied : matched == 0 ? TweakState.NotApplied : TweakState.Partial;
+        else
+        {
+            int matched = Ops.Count(o => { try { return o.Matches(); } catch { return false; } });
+            state = matched == Ops.Count ? TweakState.Applied : matched == 0 ? TweakState.NotApplied : TweakState.Partial;
+        }
+        if (state != TweakState.Applied && IsOnElsewhere()) state = TweakState.Applied;
+        return state;
+    }
+
+    public bool IsOnElsewhere()
+    {
+        try { return AlsoOnWhen?.Invoke() == true; } catch { return false; }
     }
 }
 
@@ -176,8 +221,10 @@ public static class TweakEngine
                 if (r.Item1)
                 {
                     Journal.CloseAll(ChangeKind.Tweak, t.Id);
-                    Journal.Add(new ChangeRecord { Kind = ChangeKind.Tweak, Target = t.Id + ":revert", Title = $"Restored: {t.Name}", Detail = r.Item2, Reversible = false });
+                    Journal.Add(new ChangeRecord { Kind = ChangeKind.Tweak, Target = t.Id + ":revert", Title = $"Turned off: {t.Name}", Detail = r.Item2, Reversible = false });
+                    var stillOn = await EnsureOffElsewhereAsync(t);
                     TweakChanged?.Invoke(t);
+                    if (stillOn is not null) return (false, stillOn);
                 }
                 return r;
             }
@@ -200,16 +247,26 @@ public static class TweakEngine
                         else Reg.Write(op.Hive, op.Path, op.Name, op.WindowsDefault, op.Kind);
                     }
                 }
+                // If the restored state is still "on" (Windows' default IS on, or it was on before
+                // VYTRIX touched it), write the explicit off value so the switch really turns it off.
+                var forced = new List<RegSnapshot>();
+                foreach (var op in t.Ops.Where(o => o.OffValue is not null && o.Matches()))
+                {
+                    forced.Add(Reg.Capture(op.Hive, op.Path, op.Name));
+                    Reg.Write(op.Hive, op.Path, op.Name, op.OffValue!, op.Kind);
+                }
                 Journal.CloseAll(ChangeKind.Tweak, t.Id);
                 Journal.Add(new ChangeRecord
                 {
-                    Kind = ChangeKind.Tweak, Target = t.Id + ":revert", Title = $"Restored: {t.Name}", Reversible = false,
+                    Kind = ChangeKind.Tweak, Target = t.Id + ":revert", Title = $"Turned off: {t.Name}", Reversible = forced.Count > 0, Snapshots = forced,
                     Detail = usedJournal ? "Restored the exact values recorded before VYTRIX changed them." : "No prior record existed; restored Windows defaults.",
                 });
             });
             t.AfterChange?.Invoke(false);
+            var still = await EnsureOffElsewhereAsync(t);
             TweakChanged?.Invoke(t);
-            return (true, usedJournal ? $"{t.Name} restored to your previous setting." : $"{t.Name} restored to the Windows default.");
+            if (still is not null) return (false, still);
+            return (true, usedJournal ? $"{t.Name} restored to your previous setting." : $"{t.Name} turned off (Windows default restored).");
         }
         catch (UnauthorizedAccessException)
         {
@@ -221,6 +278,38 @@ public static class TweakEngine
             return (false, $"Could not revert \"{t.Name}\": {ex.Message}");
         }
     }
+
+    /// <summary>
+    /// After VYTRIX's own values are reverted, the setting may still be on through another
+    /// route (Windows Settings, a policy, a driver default). Turn it off there if that route
+    /// is safe to change; otherwise return an honest message saying where it's still on.
+    /// Returns null when the setting is now off.
+    /// </summary>
+    private static async Task<string?> EnsureOffElsewhereAsync(Tweak t)
+    {
+        if (!t.IsOnElsewhere()) return null;
+        if (t.TurnOffElsewhere is not null)
+        {
+            var (ok, msg) = await t.TurnOffElsewhere();
+            if (ok && !t.IsOnElsewhere()) return null;
+            return $"\"{t.Name}\" is still on through {t.AlsoOnSource ?? "another Windows setting"}: {msg}";
+        }
+        return $"VYTRIX undid its own change, but \"{t.Name}\" is still on through {t.AlsoOnSource ?? "another Windows setting"}. Change it there to turn it off.";
+    }
+
+    /// <summary>Writes one value at an alternate location with a journaled snapshot (used by TurnOffElsewhere).</summary>
+    internal static Task<(bool, string)> SetElsewhere(Hive hive, string path, string name, int value, string id, string what) => Task.Run<(bool, string)>(() =>
+    {
+        if (hive == Hive.HKLM && !Elevation.IsAdmin) return (false, "needs administrator mode");
+        try
+        {
+            var snap = Reg.Capture(hive, path, name);
+            Reg.Write(hive, path, name, value, RegistryValueKind.DWord);
+            Journal.Add(new ChangeRecord { Kind = ChangeKind.Tweak, Target = id + ":elsewhere", Title = what, Detail = $@"{hive}\{path}\{name} = {value}", Snapshots = [snap] });
+            return (true, what);
+        }
+        catch (Exception ex) { return (false, ex.Message); }
+    });
 
     /// <summary>Rolls back one journal record (any kind that is registry-based).</summary>
     public static async Task<(bool Ok, string Message)> RollbackRecordAsync(ChangeRecord r)
@@ -374,18 +463,30 @@ public static class TweakCatalog
             Compatibility = "Windows 10 2004+ / Windows 11 with a supporting driver (NVIDIA GTX 10-series+, AMD RX 5000+, recent Intel).",
             SupportCheck = HagsSupport,
             Ops = [RegOp.DWord(Hive.HKLM, @"SYSTEM\CurrentControlSet\Control\GraphicsDrivers", "HwSchMode", 2, null)],
+            // Newer drivers turn HAGS on by default without writing HwSchMode; ask the driver.
+            AlsoOnWhen = () => Reg.Read(Hive.HKLM, @"SYSTEM\CurrentControlSet\Control\GraphicsDrivers", "HwSchMode") is null
+                            && SystemInfo.Gpus.Any(g => g.IsSoftware == 0 && g.HagsEnabled == 1),
+            AlsoOnSource = "your graphics driver's default",
+            TurnOffElsewhere = () => TweakEngine.SetElsewhere(Hive.HKLM, @"SYSTEM\CurrentControlSet\Control\GraphicsDrivers", "HwSchMode", 1, "gaming.hags", "Set HAGS off (overrides the driver default)"),
         },
         new()
         {
             Id = "gaming.gamedvr", Name = "Turn off background game recording", Category = TweakCategory.Gaming,
             Description = "Stops Xbox Game Bar from continuously recording the last moments of gameplay.",
-            ExpectedEffect = "Frees the GPU video encoder and some disk writes during games. You can still record manually if you re-enable it.",
-            Explanation = "Equivalent to Settings → Gaming → Captures → \"Record what happened\" off. Background recording keeps a rolling buffer encoded by the GPU, which costs a few percent of performance on some systems. This does not uninstall Game Bar.",
-            Ops =
-            [
-                RegOp.DWord(Hive.HKCU, @"System\GameConfigStore", "GameDVR_Enabled", 0, 1),
-                RegOp.DWord(Hive.HKCU, @"Software\Microsoft\Windows\CurrentVersion\GameDVR", "AppCaptureEnabled", 0, null),
-            ],
+            ExpectedEffect = "Frees the GPU video encoder and some disk writes during games. Manual captures (Win+Alt+R, screenshots) keep working.",
+            Explanation = "Same switch as Settings → Gaming → Captures → \"Record what happened\". Background recording keeps a rolling buffer encoded by the GPU, which costs a few percent of performance on some systems. It is off by default on Windows 11, so this often shows as already on. If you've turned off Game Bar captures entirely, background recording is off too, and VYTRIX recognises that.",
+            Ops = [RegOp.DWord(Hive.HKCU, @"Software\Microsoft\Windows\CurrentVersion\GameDVR", "HistoricalCaptureEnabled", 0, 0) with { OffValue = 1 }],
+            // Captures disabled entirely also means no background recording.
+            AlsoOnWhen = () => Reg.Read(Hive.HKCU, @"Software\Microsoft\Windows\CurrentVersion\GameDVR", "AppCaptureEnabled") is 0
+                            || Reg.Read(Hive.HKCU, @"System\GameConfigStore", "GameDVR_Enabled") is 0,
+            AlsoOnSource = "Xbox Game Bar captures being turned off (Settings → Gaming → Captures)",
+            // Turning background recording back on means captures must be allowed again.
+            TurnOffElsewhere = async () =>
+            {
+                var a = await TweakEngine.SetElsewhere(Hive.HKCU, @"Software\Microsoft\Windows\CurrentVersion\GameDVR", "AppCaptureEnabled", 1, "gaming.gamedvr", "Re-enabled Game Bar captures");
+                var b = await TweakEngine.SetElsewhere(Hive.HKCU, @"System\GameConfigStore", "GameDVR_Enabled", 1, "gaming.gamedvr", "Re-enabled Game DVR");
+                return (a.Item1 && b.Item1, a.Item1 ? b.Item2 : a.Item2);
+            },
         },
         new()
         {
@@ -468,6 +569,8 @@ public static class TweakCatalog
             Explanation = "The Windows 10 \"Let apps run in the background\" master switch. Windows 11 manages this per app (Settings → Apps → app → Advanced options); this value is still honoured on many builds. Desktop programs are not affected.",
             Compatibility = "Fully effective on Windows 10; partially on Windows 11 (per-app settings take priority).",
             Ops = [RegOp.DWord(Hive.HKCU, @"Software\Microsoft\Windows\CurrentVersion\BackgroundAccessApplications", "GlobalUserDisabled", 1, null)],
+            AlsoOnWhen = () => Reg.Read(Hive.HKLM, @"SOFTWARE\Policies\Microsoft\Windows\AppPrivacy", "LetAppsRunInBackground") is 2,
+            AlsoOnSource = "a Group Policy (\"Let Windows apps run in the background\" = Force Deny)",
         },
         new()
         {
@@ -488,6 +591,10 @@ public static class TweakCatalog
             Explanation = "Applies the documented user policy DisableSearchBoxSuggestions. Takes effect after Explorer restarts or you sign out.",
             AppliesAfter = "Sign out or Explorer restart",
             Ops = [RegOp.DWord(Hive.HKCU, @"Software\Policies\Microsoft\Windows\Explorer", "DisableSearchBoxSuggestions", 1, null)],
+            // Search settings' own switch for Bing results.
+            AlsoOnWhen = () => Reg.Read(Hive.HKCU, @"Software\Microsoft\Windows\CurrentVersion\Search", "BingSearchEnabled") is 0,
+            AlsoOnSource = "Windows Search settings (BingSearchEnabled = 0)",
+            TurnOffElsewhere = () => TweakEngine.SetElsewhere(Hive.HKCU, @"Software\Microsoft\Windows\CurrentVersion\Search", "BingSearchEnabled", 1, "win.websearch", "Re-enabled Bing results in Start search"),
         },
         new()
         {
@@ -559,6 +666,9 @@ public static class TweakCatalog
             Explanation = "Sets the documented AllowTelemetry policy to 1 (Required). This does NOT disable Windows Update, Defender or any security service. Note: Windows will show \"Some settings are managed by your organization\" while a policy is set.",
             RequiresAdmin = true, Risk = Risk.Moderate,
             Ops = [RegOp.DWord(Hive.HKLM, @"SOFTWARE\Policies\Microsoft\Windows\DataCollection", "AllowTelemetry", 1, null)],
+            // Settings → Diagnostics & feedback → "Send optional diagnostic data" off stores 0/1 here.
+            AlsoOnWhen = () => Reg.Read(Hive.HKLM, @"SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\DataCollection", "AllowTelemetry") is int v && v <= 1,
+            AlsoOnSource = "Windows Settings → Privacy & security → Diagnostics & feedback (\"Send optional diagnostic data\" is off)",
         },
         new()
         {
@@ -578,6 +688,15 @@ public static class TweakCatalog
             Explanation = "Applies the documented DODownloadMode policy = 1 (LAN). Updates still download normally from Microsoft.",
             RequiresAdmin = true,
             Ops = [RegOp.DWord(Hive.HKLM, @"SOFTWARE\Policies\Microsoft\Windows\DeliveryOptimization", "DODownloadMode", 1, null)],
+            // Settings → Windows Update → Delivery Optimization stores the choice in the Network Service profile
+            // (0 = off, 1 = local network). Only readable with administrator rights.
+            AlsoOnWhen = () =>
+            {
+                using var users = RegistryKey.OpenBaseKey(RegistryHive.Users, RegistryView.Registry64);
+                using var k = users.OpenSubKey(@"S-1-5-20\Software\Microsoft\Windows\CurrentVersion\DeliveryOptimization\Settings");
+                return k?.GetValue("DownloadMode") is int m && m is 0 or 1;
+            },
+            AlsoOnSource = "Windows Settings → Windows Update → Advanced options → Delivery Optimization",
         },
 
         // ───────────────────────────── Startup
@@ -597,6 +716,9 @@ public static class TweakCatalog
             Explanation = "Same as Control Panel → Power Options → \"Turn on fast startup\". Fast Startup saves the kernel session to disk at shutdown; turning it off makes every shutdown a clean start.",
             RequiresAdmin = true,
             Ops = [RegOp.DWord(Hive.HKLM, @"SYSTEM\CurrentControlSet\Control\Session Manager\Power", "HiberbootEnabled", 0, 1)],
+            // Fast Startup needs hibernation; with hibernation disabled it's effectively off.
+            AlsoOnWhen = () => Reg.Read(Hive.HKLM, @"SYSTEM\CurrentControlSet\Control\Power", "HibernateEnabled") is 0,
+            AlsoOnSource = "hibernation being disabled (Fast Startup can't run without it)",
         },
 
         // ───────────────────────────── Power

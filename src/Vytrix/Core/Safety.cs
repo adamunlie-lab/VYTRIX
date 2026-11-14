@@ -277,8 +277,11 @@ public static class RestorePoints
 
 public sealed class AppSettings
 {
-    public string Theme { get; set; } = "Cherry Blossom";
-    public string Accent { get; set; } = "Sakura";
+    public string Theme { get; set; } = "Christmas";
+    public string Accent { get; set; } = "Crimson";
+    /// <summary>Set once the Christmas theme has been introduced to an existing install.</summary>
+    public bool ChristmasIntroduced { get; set; }
+    public double MusicVolume { get; set; } = 0.55;
     /// <summary>Set once the Cherry Blossom theme has been made the default for an existing install.</summary>
     public bool CherryBlossomIntroduced { get; set; }
     public bool ShowFallingPetals { get; set; } = true;
