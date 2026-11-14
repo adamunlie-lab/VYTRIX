@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Vytrix/Vytrix.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Vytrix.Tests/Vytrix.Tests.csproj" />
+  </Folder>
+</Solution>

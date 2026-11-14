@@ -1,0 +1,114 @@
+<Window x:Class="Vytrix.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="VYTRIX" Width="1320" Height="840" MinWidth="980" MinHeight="640"
+        WindowStartupLocation="CenterScreen" Background="{StaticResource BgBrush}"
+        Foreground="{StaticResource TextBrush}" FontFamily="{StaticResource UiFont}"
+        Icon="Assets/vytrix.ico" UseLayoutRounding="True" SnapsToDevicePixels="True">
+    <WindowChrome.WindowChrome>
+        <WindowChrome CaptionHeight="46" ResizeBorderThickness="6" GlassFrameThickness="0" CornerRadius="0" UseAeroCaptionButtons="False"/>
+    </WindowChrome.WindowChrome>
+
+    <Grid x:Name="RootGrid">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="236"/>
+            <ColumnDefinition/>
+        </Grid.ColumnDefinitions>
+
+        <!-- ═══════ Sidebar ═══════ -->
+        <Border Background="{StaticResource SidebarBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,1,0">
+            <DockPanel>
+                <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="22,20,0,22">
+                    <Border Width="34" Height="34" CornerRadius="9" Background="{StaticResource Surface2Brush}" BorderBrush="{StaticResource BorderStrongBrush}" BorderThickness="1">
+                        <Path Data="{StaticResource LogoMark}" Fill="{DynamicResource LogoBrush}" Stretch="Uniform" Width="18" Height="16" Margin="0,2,0,0"/>
+                    </Border>
+                    <StackPanel Margin="11,0,0,0" VerticalAlignment="Center">
+                        <TextBlock Text="VYTRIX" FontFamily="{StaticResource NumberFont}" FontSize="17" FontWeight="SemiBold"/>
+                        <TextBlock Text="Precision Performance" FontSize="10.5" Foreground="{StaticResource TextMutedBrush}"/>
+                    </StackPanel>
+                </StackPanel>
+
+                <Border DockPanel.Dock="Bottom" Margin="14,8,14,16" Padding="12,10" CornerRadius="9" Background="{StaticResource SurfaceBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1">
+                    <StackPanel>
+                        <StackPanel Orientation="Horizontal">
+                            <Ellipse x:Name="AdminDot" Width="7" Height="7" Fill="{StaticResource WarnBrush}" VerticalAlignment="Center"/>
+                            <TextBlock x:Name="AdminText" Text="Standard mode" FontSize="12" Margin="8,0,0,0"/>
+                        </StackPanel>
+                        <TextBlock x:Name="AdminHint" Text="Machine-wide changes need administrator rights." Style="{StaticResource Muted}" FontSize="11" Margin="0,4,0,8"/>
+                        <Button x:Name="ElevateButton" Content="Relaunch as administrator" FontSize="12" Padding="10,6" Click="Elevate_Click"/>
+                    </StackPanel>
+                </Border>
+
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel x:Name="NavPanel" Margin="12,0,12,0"/>
+                </ScrollViewer>
+            </DockPanel>
+        </Border>
+
+        <!-- ═══════ Content ═══════ -->
+        <Grid Grid.Column="1">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="46"/>
+                <RowDefinition/>
+            </Grid.RowDefinitions>
+
+            <!-- Theme scene (Cherry Blossom tree) behind every page -->
+            <Grid x:Name="SceneHost" Grid.RowSpan="2" IsHitTestVisible="False" ClipToBounds="True"/>
+
+            <!-- Title bar -->
+            <Grid Background="Transparent">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <Grid HorizontalAlignment="Left" Margin="32,8,0,0" Width="360" WindowChrome.IsHitTestVisibleInChrome="True">
+                    <TextBox x:Name="GlobalSearch" Tag="Search tweaks, pages and settings   (Ctrl+K)" Padding="34,6,10,6"
+                             TextChanged="GlobalSearch_TextChanged" PreviewKeyDown="GlobalSearch_KeyDown" LostKeyboardFocus="GlobalSearch_LostFocus"/>
+                    <Path Data="{StaticResource IcoSearch}" Style="{StaticResource Icon}" Width="14" Height="14" HorizontalAlignment="Left" Margin="12,0,0,0" IsHitTestVisible="False"/>
+                    <Popup x:Name="SearchPopup" PlacementTarget="{Binding ElementName=GlobalSearch}" Placement="Bottom" AllowsTransparency="True" StaysOpen="True" Width="460">
+                        <Border Background="{StaticResource Surface2Brush}" BorderBrush="{StaticResource BorderStrongBrush}" BorderThickness="1" CornerRadius="9" Padding="6" Margin="0,6,0,0">
+                            <ListBox x:Name="SearchResults" Style="{StaticResource PlainList}" MaxHeight="380" PreviewMouseLeftButtonUp="SearchResults_Click"/>
+                        </Border>
+                    </Popup>
+                </Grid>
+                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Top">
+                    <Button Style="{StaticResource ChromeButton}" Click="Min_Click" ToolTip="Minimise">
+                        <Path Data="{StaticResource IcoMin}" Style="{StaticResource Icon}" Width="11" Height="11"/>
+                    </Button>
+                    <Button Style="{StaticResource ChromeButton}" Click="Max_Click" ToolTip="Maximise">
+                        <Path Data="{StaticResource IcoMax}" Style="{StaticResource Icon}" Width="10" Height="10"/>
+                    </Button>
+                    <Button x:Name="CloseButton" Style="{StaticResource ChromeButton}" Click="Close_Click" ToolTip="Close">
+                        <Path Data="{StaticResource IcoClose}" Style="{StaticResource Icon}" Width="11" Height="11"/>
+                    </Button>
+                </StackPanel>
+            </Grid>
+
+            <ContentControl x:Name="PageHost" Grid.Row="1" Focusable="False"/>
+        </Grid>
+
+        <!-- ═══════ Overlays ═══════ -->
+        <Grid x:Name="PetalHost" Grid.ColumnSpan="2" IsHitTestVisible="False" Opacity="0.8"/>
+        <Grid x:Name="DialogLayer" Grid.ColumnSpan="2" Visibility="Collapsed" Background="#B3050507">
+            <Border x:Name="DialogCard" Style="{StaticResource Card}" Background="{StaticResource Surface2Brush}" BorderBrush="{StaticResource BorderStrongBrush}"
+                    MaxWidth="560" MinWidth="420" HorizontalAlignment="Center" VerticalAlignment="Center" Padding="24">
+                <Border.Effect>
+                    <DropShadowEffect BlurRadius="40" ShadowDepth="0" Opacity="0.6" Color="Black"/>
+                </Border.Effect>
+                <StackPanel>
+                    <StackPanel Orientation="Horizontal">
+                        <Path x:Name="DialogIcon" Data="{StaticResource IcoInfo}" Style="{StaticResource Icon}" Width="20" Height="20" Margin="0,0,12,0"/>
+                        <TextBlock x:Name="DialogTitle" Style="{StaticResource H2}" FontSize="17" VerticalAlignment="Center"/>
+                    </StackPanel>
+                    <ContentControl x:Name="DialogBody" Margin="0,14,0,0" Focusable="False"/>
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,22,0,0">
+                        <Button x:Name="DialogCancel" Content="Cancel" Style="{StaticResource Ghost}" Click="DialogCancel_Click" IsCancel="True"/>
+                        <Button x:Name="DialogOk" Content="Confirm" Style="{StaticResource Primary}" Margin="10,0,0,0" Click="DialogOk_Click"/>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+        </Grid>
+
+        <StackPanel x:Name="ToastLayer" Grid.ColumnSpan="2" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,24,24" Width="380"/>
+    </Grid>
+</Window>

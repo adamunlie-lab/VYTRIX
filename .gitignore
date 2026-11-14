@@ -1,0 +1,12 @@
+# Build output
+bin/
+obj/
+dist/
+native/bin/
+*.user
+.vs/
+
+# QA output: contains machine-specific details (computer name, DNS, power plan). Never publish.
+qa-results/
+TestResults/
+*.trx

@@ -1,0 +1,179 @@
+VYTRIX TERMS OF AGREEMENT
+Version 1.1 - Effective November 14, 2026
+
+Please read these Terms carefully. By installing, copying or using VYTRIX
+("the Software") you agree to these Terms. If you do not agree, do not
+install or use the Software.
+
+
+1. WHAT VYTRIX DOES
+
+VYTRIX is a Windows optimization utility. When you ask it to, it can
+change Windows settings, including registry values, power plans, DNS
+servers, startup entries, Windows service startup types and temporary
+files. Each control describes what it changes, and tweaks, profiles,
+DNS, service and cleanup actions ask for confirmation first
+(confirmation for low-risk tweaks can be turned off in Settings). Changes to
+machine-wide settings require administrator rights, which Windows asks
+you to grant.
+
+
+2. LICENSE
+
+You are granted a personal, non-exclusive, non-transferable, revocable
+license to install and use the Software on computers that you own or are
+authorized to administer.
+
+You may not:
+  (a) sell, rent, lease or sublicense the Software;
+  (b) remove or alter any copyright notice, branding or these Terms;
+  (c) redistribute a modified version of the Software under the VYTRIX
+      name or branding;
+  (d) use the Software to modify a computer you are not authorized to
+      administer.
+
+
+3. YOUR RESPONSIBILITIES
+
+  (a) You are responsible for reviewing each change before you confirm it.
+      Every tweak lists its exact effect, risk level and compatibility.
+  (b) You should keep your own backups of important files. VYTRIX's
+      cleanup tools only target system temporary and cache locations,
+      but deleted files cannot be recovered.
+  (c) Settings marked "Moderate" or "Advanced" risk involve trade-offs,
+      such as higher power use or heat. Apply them only if you understand
+      and accept those trade-offs.
+  (d) Laptop users should note that performance settings reduce battery
+      life.
+
+
+4. BACKUPS, ROLLBACK AND THEIR LIMITS
+
+VYTRIX records the previous value of every setting it changes, exports
+registry backups, and can create Windows System Restore points. These
+features are provided to help you undo changes. However:
+
+  (a) Some actions cannot be reversed. These include deleting temporary
+      files, emptying the Recycle Bin, ending a running app (unsaved
+      work in it is lost) and resetting Winsock. VYTRIX asks for
+      confirmation first and records these in the journal as not
+      reversible.
+  (b) Rollback restores the values VYTRIX recorded. If other software,
+      Windows Update or you change the same setting afterwards, rollback
+      may overwrite that later change.
+  (c) Windows may skip creating a restore point if one was created in
+      the last 24 hours, or if System Protection is turned off. VYTRIX
+      reports when this happens.
+  (d) Before uninstalling, use Restore Center > "Roll back everything"
+      if you want Windows returned to its previous configuration.
+      Uninstalling does not undo changes on its own.
+
+
+5. SAFETY COMMITMENTS
+
+VYTRIX is designed so that it:
+  (a) never disables Windows Defender, Windows Firewall, Windows Update
+      or other security and core services;
+  (b) never deletes personal files such as documents, pictures, videos,
+      music, downloads or desktop items;
+  (c) never reports a hardware reading it could not actually measure;
+      unavailable sensors are labelled "Unavailable";
+  (d) never changes Windows on its own: every change starts with an
+      action you take, on a control that describes what it changes.
+
+These commitments describe how the Software is designed. They do not
+create a warranty (see section 8).
+
+
+6. PRIVACY
+
+  (a) VYTRIX does not collect, sell or transmit personal data. It has no
+      analytics, telemetry or advertising.
+  (b) All data VYTRIX creates (settings, change journal, registry
+      backups, logs and reports) is stored locally on your computer in
+      %LocalAppData%\VYTRIX and Documents\VYTRIX Reports. You can delete
+      it at any time.
+  (c) Network activity happens only when you start it. Latency
+      diagnostics send standard ping requests to your router, to
+      public DNS providers (Cloudflare, Google) and to www.microsoft.com
+      to test name resolution, and DNS lookups go to
+      the servers you choose.
+  (e) Update checks: unless you turn them off in Settings > Updates,
+      VYTRIX checks GitHub (github.com) for a newer release when it
+      starts and every 6 hours while it is open, and may download a new
+      installer in the background. These are ordinary web requests: like
+      any website, GitHub receives your IP address and the VYTRIX version
+      number. No other information is sent.
+  (d) System reports you export may contain hardware details, installed
+      application names and your computer name. Review a report before
+      sharing it with anyone.
+
+
+7. THIRD-PARTY COMPONENTS
+
+VYTRIX uses components of Windows (such as powercfg, netsh, ipconfig,
+winsat and System Restore) and, where present, the NVIDIA Management
+Library (NVML) installed with NVIDIA graphics drivers. These components
+are provided by their respective owners under their own terms. VYTRIX is
+not affiliated with, endorsed by or sponsored by Microsoft, NVIDIA, AMD,
+Intel or any other hardware or software vendor. All trademarks belong to
+their respective owners.
+
+
+8. NO WARRANTY
+
+THE SOFTWARE IS PROVIDED "AS IS" AND "AS AVAILABLE", WITHOUT WARRANTY
+OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO WARRANTIES
+OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, NON-INFRINGEMENT,
+ACCURACY OF HARDWARE READINGS, OR THAT THE SOFTWARE WILL IMPROVE
+PERFORMANCE. Results depend on your hardware, drivers, Windows version
+and workload. Some changes produce no noticeable difference on some
+systems.
+
+
+9. LIMITATION OF LIABILITY
+
+TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS OF VYTRIX BE LIABLE FOR ANY INDIRECT,
+INCIDENTAL, SPECIAL, CONSEQUENTIAL OR PUNITIVE DAMAGES, OR FOR ANY LOSS
+OF DATA, PROFITS, OR USE, OR SYSTEM DAMAGE OR INSTABILITY, ARISING OUT OF
+OR IN CONNECTION WITH THE USE OF OR INABILITY TO USE THE SOFTWARE, EVEN
+IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
+
+Some jurisdictions do not allow the exclusion of certain warranties or
+the limitation of certain damages. In those jurisdictions, the above
+exclusions and limitations apply only to the extent permitted by law,
+and nothing in these Terms limits rights you have as a consumer that
+cannot be waived.
+
+
+10. UPDATES
+
+VYTRIX checks for new versions published on its GitHub releases page.
+Installers are downloaded only from GitHub release hosting and are
+verified against a SHA-256 checksum before they can run. An update is
+installed only after you choose "Install now" and approve the Windows
+administrator prompt; it never installs on its own. You can turn off
+automatic checks and background downloads in Settings > Updates. Updated
+versions may come with revised Terms, which you will be asked to accept.
+
+
+11. TERMINATION
+
+This license ends automatically if you breach these Terms. You may end
+it at any time by uninstalling the Software. Sections 4, 8, 9 and 12
+continue to apply after termination.
+
+
+12. GENERAL
+
+  (a) These Terms are the entire agreement between you and the authors
+      of VYTRIX about the Software.
+  (b) If any part of these Terms is found unenforceable, the rest
+      remains in effect.
+  (c) Failure to enforce any part of these Terms is not a waiver of it.
+  (d) The authors may update these Terms in future versions. A new
+      version applies only once you accept it in the Software.
+
+
+Copyright (c) 2026 VYTRIX. All rights reserved.
