@@ -309,7 +309,7 @@ public sealed class SignInWindow : Window
         }
         catch (Exception ex)
         {
-            Log.Warn("account", $"Sign-in action failed: {ex.GetType().Name}");
+            Log.Warn("account", $"Sign-in action failed: {(ex is AccountException ? ex.Message : ex.GetType().Name)}");
             _message = ex is AccountException ? ex.Message : "Something went wrong. Check your connection and try again.";
             _messageIsError = true;
         }

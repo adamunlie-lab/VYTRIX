@@ -128,7 +128,7 @@ public sealed class AccountPage : PageBase
         catch (Exception ex)
         {
             var msg = ex is AccountException ? ex.Message : "Something went wrong. Try again.";
-            Log.Warn("account", $"Account action failed: {ex.GetType().Name}");
+            Log.Warn("account", $"Account action failed: {(ex is AccountException ? ex.Message : ex.GetType().Name)}");
             if (errorText is not null) { errorText.Text = msg; errorText.Visibility = Visibility.Visible; }
             else Shell.Toast(msg, ToastKind.Warning);
         }
