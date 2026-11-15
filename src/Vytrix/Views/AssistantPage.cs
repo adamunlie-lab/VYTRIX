@@ -9,11 +9,14 @@ using Vytrix.Services;
 
 namespace Vytrix.Views;
 
-/// <summary>Chat with Claude about this PC. Suggestions arrive as buttons; nothing changes without a click.</summary>
+/// <summary>
+/// Chat about this PC. Free by default: an open AI model running locally through Ollama.
+/// Optionally Claude with the user's own Anthropic key. Suggestions are buttons; nothing changes without a click.
+/// </summary>
 public sealed class AssistantPage : PageBase
 {
     public override string PageTitle => "Assistant";
-    public override string PageSubtitle => "Ask Claude about your PC. It can suggest changes; you decide.";
+    public override string PageSubtitle => "Ask about your PC in plain language. It can suggest changes; you decide.";
 
     private static readonly string[] Starters =
     [
@@ -29,10 +32,15 @@ public sealed class AssistantPage : PageBase
     private readonly TextBox _input = new() { AcceptsReturn = true, TextWrapping = TextWrapping.Wrap, MaxHeight = 140, MinHeight = 44, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Tag = "Ask about your PC, games, startup, network or any tweak   (Enter to send, Shift+Enter for a new line)", Padding = new Thickness(12, 11, 12, 11) };
     private readonly Button _send = new() { Content = "Send", Margin = new Thickness(10, 0, 0, 0), MinWidth = 86 };
     private readonly TextBlock _status = new() { FontSize = 12, Margin = new Thickness(36, 0, 32, 6), Visibility = Visibility.Collapsed };
-    private CheckBox? _share;
-    private AssistantSession? _session;
+    private AssistantSession? _claude;
+    private LocalAssistant? _local;
+    private bool _showSetup;
     private CancellationTokenSource? _cts;
     private bool _busy;
+    private int _renderGen;
+
+    private static bool UseClaude => Settings.Current.AssistantMode == "claude";
+    private static LocalModel CurrentModel => Ollama.Models.FirstOrDefault(m => m.Id == Settings.Current.AssistantLocalModel) ?? Ollama.Models[0];
 
     protected override void Build()
     {
@@ -45,104 +53,290 @@ public sealed class AssistantPage : PageBase
             if (e.Key == Key.Enter && Keyboard.Modifiers == ModifierKeys.None) { e.Handled = true; await SendOrStopAsync(); }
         };
         _status.Foreground = Ui.Res("TextMutedBrush");
-        Render();
+        _ = RenderAsync();
     }
 
     public override void OnShown()
     {
-        if (_session is not null && !_busy) _input.Focus();
+        if (!_busy && (_claude is not null || _local is not null) && !_showSetup) _input.Focus();
     }
 
-    private void Render()
+    private void Clear()
     {
         HeaderActions.Children.Clear();
         _host.Children.Clear();
         _host.RowDefinitions.Clear();
-        var key = AssistantKey.Load();
-        if (key is null) { BuildSetup(); return; }
-        _session ??= new AssistantSession(key);
-        BuildChat();
     }
 
-    // ───────────────────────── Setup (no key yet)
+    private async Task RenderAsync()
+    {
+        int gen = ++_renderGen;
+        Clear();
+        if (!_showSetup)
+        {
+            if (UseClaude && AssistantKey.Load() is { } key)
+            {
+                _claude ??= new AssistantSession(key);
+                BuildChat();
+                return;
+            }
+            if (!UseClaude)
+            {
+                _host.Children.Add(new TextBlock { Text = "Starting the local AI…", Style = Ui.Style("Muted"), Margin = new Thickness(32, 12, 32, 0) });
+                bool ready = await Ollama.EnsureRunningAsync() && await Ollama.HasModelAsync(CurrentModel.Id);
+                if (gen != _renderGen) return;
+                Clear();
+                if (ready)
+                {
+                    if (_local?.Model != CurrentModel.Id) { _local = new LocalAssistant(CurrentModel.Id); _chat.Children.Clear(); }
+                    BuildChat();
+                    return;
+                }
+            }
+        }
+        BuildSetup();
+    }
+
+    // ───────────────────────── Setup
 
     private void BuildSetup()
     {
-        var body = new StackPanel { Margin = new Thickness(32, 8, 32, 32), MaxWidth = 760, HorizontalAlignment = HorizontalAlignment.Left };
+        var body = new StackPanel { Margin = new Thickness(32, 8, 32, 32), MaxWidth = 780, HorizontalAlignment = HorizontalAlignment.Left };
 
         var intro = new StackPanel();
-        intro.Children.Add(Para("The Assistant uses **Claude**, made by Anthropic, to answer questions about your PC in plain language. It can look at your PC's readings and tweaks, explain what would help, and offer buttons for the changes it recommends."));
+        intro.Children.Add(Para("Ask questions about your PC in plain language. The Assistant looks at your PC's readings and tweaks, explains what would help, and offers buttons for the changes it recommends."));
         intro.Children.Add(Para("It **can't change anything by itself**. Every suggestion is a button you choose to click, tweaks still ask you to confirm, and everything stays undoable in the Restore Center."));
-        body.Children.Add(Kit.Card(intro, "Meet your VYTRIX Assistant", "Optional, and off until you add a key."));
+        body.Children.Add(Kit.Card(intro, "Meet your VYTRIX Assistant", "Free, and it runs on your own PC."));
 
-        var steps = new StackPanel();
-        steps.Children.Add(Step(1, "Create an Anthropic API key in the Anthropic Console, under API keys. Usage is billed to your Anthropic account, usually a few cents per conversation."));
-        steps.Children.Add(Step(2, "Paste it below. VYTRIX stores it on this PC, encrypted for your Windows account, and only ever sends it to Anthropic."));
+        var free = new StackPanel();
+        BuildLocalSetup(free);
+        var freeCard = Kit.Card(free, "Free AI on your PC", "Private and offline. Nothing you ask ever leaves this computer.", Ui.Badge("Recommended", "GoodBrush", "GoodSoftBrush"));
+        freeCard.Margin = new Thickness(0, 14, 0, 0);
+        body.Children.Add(freeCard);
+
+        var claude = new StackPanel();
+        BuildClaudeSetup(claude);
+        var claudeCard = Kit.Card(claude, "Optional: Claude", "Smarter answers from Anthropic's Claude. Needs your own Anthropic API key, which is paid per use.");
+        claudeCard.Margin = new Thickness(0, 14, 0, 0);
+        body.Children.Add(claudeCard);
+
+        if (_claude is not null || _local is not null)
+        {
+            var back = new Button { Content = "Back to chat", Style = Ui.Style("Ghost"), HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(0, 14, 0, 0) };
+            back.Click += async (_, _) => { _showSetup = false; await RenderAsync(); };
+            body.Children.Add(back);
+        }
+
+        _host.Children.Add(new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Content = body, Focusable = false });
+    }
+
+    private void BuildLocalSetup(StackPanel sp)
+    {
+        sp.Children.Add(Para("VYTRIX uses **Ollama**, a free app that runs open AI models on your PC. It needs a one-time download, then works without the internet. Answers are good for everyday questions, though not as sharp as Claude."));
+
+        // Step 1: Ollama
+        var ollamaState = new TextBlock { FontSize = 13, TextWrapping = TextWrapping.Wrap, VerticalAlignment = VerticalAlignment.Center };
+        var install = new Button { Content = "Install Ollama (free)", Style = Ui.Style("Primary") };
+        var site = Ui.IconButton("IcoExport", "Get it from ollama.com", "Ghost");
+        site.Margin = new Thickness(8, 0, 0, 0);
+        site.Click += (_, _) => SysCmd.Open(Ollama.DownloadPage);
+        var recheck = new Button { Content = "Check again", Style = Ui.Style("Ghost"), Margin = new Thickness(8, 0, 0, 0) };
+        var ollamaButtons = Kit.Row(install, site, recheck);
+        ollamaButtons.Margin = new Thickness(36, 8, 0, 0);
+        sp.Children.Add(StepRow(1, "Install Ollama", ollamaState));
+        sp.Children.Add(ollamaButtons);
+
+        // Step 2: model
+        var models = new ComboBox { Width = 330, HorizontalAlignment = HorizontalAlignment.Left };
+        foreach (var m in Ollama.Models) models.Items.Add(new ComboBoxItem { Content = $"{m.Name}  ·  {m.Size}", Tag = m.Id, ToolTip = m.Note, Style = Ui.Style("ComboItem") });
+        models.SelectedIndex = Math.Max(0, Array.FindIndex(Ollama.Models, m => m.Id == CurrentModel.Id));
+        var modelNote = new TextBlock { Style = Ui.Style("Muted"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 6, 0, 0) };
+        var modelState = new TextBlock { FontSize = 13, TextWrapping = TextWrapping.Wrap, VerticalAlignment = VerticalAlignment.Center };
+        var download = new Button { Content = "Download model", Style = Ui.Style("Primary"), Margin = new Thickness(10, 0, 0, 0) };
+        var barTrack = new Border { Height = 6, CornerRadius = new CornerRadius(3), Background = Ui.Res("Surface3Brush"), Margin = new Thickness(0, 10, 0, 0), Visibility = Visibility.Collapsed };
+        var barFill = new Border { Height = 6, CornerRadius = new CornerRadius(3), Background = Ui.Res("AccentBrush"), HorizontalAlignment = HorizontalAlignment.Left, RenderTransformOrigin = new Point(0, 0.5), RenderTransform = new ScaleTransform(0, 1) };
+        barTrack.Child = barFill;
+        barTrack.SizeChanged += (_, _) => barFill.Width = barTrack.ActualWidth;
+        var progress = new TextBlock { Style = Ui.Style("Muted"), Margin = new Thickness(0, 6, 0, 0), Visibility = Visibility.Collapsed };
+        var modelRow = Kit.Row(models, download);
+        var modelBox = new StackPanel { Margin = new Thickness(36, 8, 0, 0) };
+        modelBox.Children.Add(modelRow);
+        modelBox.Children.Add(modelNote);
+        modelBox.Children.Add(barTrack);
+        modelBox.Children.Add(progress);
+        sp.Children.Add(StepRow(2, "Download an AI model", modelState, new Thickness(0, 18, 0, 0)));
+        sp.Children.Add(modelBox);
+
+        var start = new Button { Content = "Start chatting", Style = Ui.Style("Primary"), HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(0, 20, 0, 0), IsEnabled = false };
+        sp.Children.Add(start);
+
+        string Selected() => (models.SelectedItem as ComboBoxItem)?.Tag as string ?? Ollama.Models[0].Id;
+        CancellationTokenSource? pullCts = null;
+
+        async Task Refresh()
+        {
+            var m = Ollama.Models.First(x => x.Id == Selected());
+            modelNote.Text = m.Note;
+            bool installed = Ollama.Installed;
+            bool running = installed && await Ollama.EnsureRunningAsync();
+            if (running)
+            {
+                ollamaState.Text = $"✓  Ollama {await Ollama.VersionAsync()} is installed and running.";
+                ollamaState.Foreground = Ui.Res("GoodBrush");
+                ollamaButtons.Visibility = Visibility.Collapsed;
+            }
+            else
+            {
+                ollamaState.Text = installed ? "Ollama is installed but didn't start. Open it from the Start menu, then click Check again." : "Not installed yet. It's free and takes about a minute.";
+                ollamaState.Foreground = Ui.Res(installed ? "WarnBrush" : "TextDimBrush");
+                ollamaButtons.Visibility = Visibility.Visible;
+                install.Visibility = installed ? Visibility.Collapsed : Visibility.Visible;
+            }
+            bool has = running && await Ollama.HasModelAsync(m.Id);
+            if (pullCts is null)
+            {
+                modelState.Text = !running ? "Available once Ollama is running." : has ? $"✓  {m.Name} model is downloaded and ready." : $"Pick a model and download it once ({m.Size}).";
+                modelState.Foreground = Ui.Res(has ? "GoodBrush" : "TextDimBrush");
+                download.Visibility = has ? Visibility.Collapsed : Visibility.Visible;
+                download.IsEnabled = running;
+            }
+            models.IsEnabled = pullCts is null;
+            start.IsEnabled = running && has && pullCts is null;
+        }
+
+        models.SelectionChanged += async (_, _) => await Refresh();
+        recheck.Click += async (_, _) => await Refresh();
+        install.Click += async (_, _) =>
+        {
+            install.IsEnabled = false;
+            ollamaState.Text = "Installing Ollama… this can take a minute or two. Windows may ask for permission.";
+            ollamaState.Foreground = Ui.Res("TextDimBrush");
+            var (ok, msg) = await Ollama.InstallAsync();
+            install.IsEnabled = true;
+            Shell.Toast(msg, ok ? ToastKind.Success : ToastKind.Warning);
+            await Refresh();
+        };
+        download.Click += async (_, _) =>
+        {
+            if (pullCts is not null) { pullCts.Cancel(); return; }
+            var m = Ollama.Models.First(x => x.Id == Selected());
+            pullCts = new CancellationTokenSource();
+            download.Content = "Cancel";
+            download.Style = Ui.Style("Ghost");
+            models.IsEnabled = false;
+            start.IsEnabled = false;
+            barTrack.Visibility = progress.Visibility = Visibility.Visible;
+            modelState.Text = $"Downloading the {m.Name} model ({m.Size})…";
+            var prog = new Progress<(string Status, double Fraction)>(p =>
+            {
+                if (p.Fraction >= 0) ((ScaleTransform)barFill.RenderTransform).ScaleX = p.Fraction;
+                progress.Text = p.Fraction >= 0 ? $"{p.Fraction:P0}" : Capitalize(p.Status);
+            });
+            var (ok, msg) = await Ollama.PullAsync(m.Id, prog, pullCts.Token);
+            pullCts.Dispose(); pullCts = null;
+            download.Content = "Download model";
+            download.Style = Ui.Style("Primary");
+            barTrack.Visibility = progress.Visibility = Visibility.Collapsed;
+            Shell.Toast(msg, ok ? ToastKind.Success : ToastKind.Warning);
+            await Refresh();
+        };
+        start.Click += async (_, _) =>
+        {
+            Settings.Current.AssistantMode = "local";
+            Settings.Current.AssistantLocalModel = Selected();
+            Settings.Save();
+            _showSetup = false;
+            await RenderAsync();
+        };
+        _ = Refresh();
+    }
+
+    private void BuildClaudeSetup(StackPanel sp)
+    {
+        sp.Children.Add(Para("Create an API key in the Anthropic Console and paste it here. Usage is billed to your Anthropic account. The key is stored on this PC, encrypted for your Windows account, and only ever sent to Anthropic."));
+        sp.Children.Add(Para("With **Share PC details** on, your hardware, live readings, tweak states, top apps and VYTRIX's change history are sent with your questions. Your files, computer name and user name never are."));
+        bool hasKey = AssistantKey.Exists;
+        if (hasKey)
+        {
+            var use = new Button { Content = "Use Claude", Style = Ui.Style("Primary") };
+            use.Click += async (_, _) => { Settings.Current.AssistantMode = "claude"; Settings.Save(); _showSetup = false; await RenderAsync(); };
+            var remove = new Button { Content = "Remove key", Style = Ui.Style("Ghost"), Margin = new Thickness(8, 0, 0, 0) };
+            remove.Click += async (_, _) =>
+            {
+                if (!await Shell.ConfirmAsync("Remove your API key?", "VYTRIX will delete the key stored on this PC. The key keeps working in your Anthropic account until you revoke it there.", "Remove key", danger: true)) return;
+                AssistantKey.Delete();
+                _claude = null;
+                if (UseClaude) { Settings.Current.AssistantMode = "local"; Settings.Save(); }
+                await RenderAsync();
+            };
+            var state = new TextBlock { Text = "✓  A key is saved on this PC.", Foreground = Ui.Res("GoodBrush"), FontSize = 13, Margin = new Thickness(0, 0, 0, 10) };
+            sp.Children.Add(state);
+            sp.Children.Add(Kit.Row(use, remove));
+            return;
+        }
         var console = Ui.IconButton("IcoExport", "Open Anthropic Console", "Ghost");
         console.HorizontalAlignment = HorizontalAlignment.Left;
-        console.Margin = new Thickness(0, 4, 0, 14);
+        console.Margin = new Thickness(0, 0, 0, 12);
         console.Click += (_, _) => SysCmd.Open("https://console.anthropic.com/settings/keys");
-        steps.Children.Add(console);
-
+        sp.Children.Add(console);
         var pw = new PasswordBox { Height = 38, Padding = new Thickness(10, 8, 10, 8), FontSize = 13, ToolTip = "Your Anthropic API key (starts with sk-ant-)" };
-        var save = new Button { Content = "Save key and start", Style = Ui.Style("Primary"), Margin = new Thickness(10, 0, 0, 0) };
+        var save = new Button { Content = "Save key and use Claude", Style = Ui.Style("Ghost"), Margin = new Thickness(10, 0, 0, 0) };
         var row = new Grid();
         row.ColumnDefinitions.Add(new ColumnDefinition());
         row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         row.Children.Add(pw);
         Grid.SetColumn(save, 1);
         row.Children.Add(save);
-        steps.Children.Add(row);
+        sp.Children.Add(row);
         var err = new TextBlock { Foreground = Ui.Res("BadBrush"), FontSize = 12, Margin = new Thickness(0, 8, 0, 0), Visibility = Visibility.Collapsed, TextWrapping = TextWrapping.Wrap };
-        steps.Children.Add(err);
-        save.Click += (_, _) =>
+        sp.Children.Add(err);
+        save.Click += async (_, _) =>
         {
             var k = pw.Password.Trim();
             if (!AssistantKey.LooksValid(k)) { err.Text = "That doesn't look like an Anthropic API key. It should start with sk-ant- and have no spaces."; err.Visibility = Visibility.Visible; return; }
             try { AssistantKey.Save(k); }
             catch (Exception ex) { err.Text = "Couldn't save the key: " + ex.Message; err.Visibility = Visibility.Visible; return; }
             pw.Clear();
-            _session = null;
-            Render();
-            Shell.Toast("Assistant ready. Ask it anything about your PC.", ToastKind.Success);
+            _claude = null;
+            Settings.Current.AssistantMode = "claude";
+            Settings.Save();
+            _showSetup = false;
+            await RenderAsync();
+            Shell.Toast("Claude is ready. Ask it anything about your PC.", ToastKind.Success);
         };
-        var setupCard = Kit.Card(steps, "Set up in two steps");
-        setupCard.Margin = new Thickness(0, 14, 0, 0);
-        body.Children.Add(setupCard);
-
-        var priv = new StackPanel();
-        priv.Children.Add(Para("Your messages go to Anthropic to generate answers. With **Share PC details** on, the Assistant can also read your hardware models, live readings, free disk space, Windows version, tweak states, the names and memory use of your top apps, and VYTRIX's change history."));
-        priv.Children.Add(Para("It never sends your files, your computer name or your Windows user name. You can turn sharing off at any time, or remove your key. Details are in the Terms of Agreement, section 6."));
-        var privCard = Kit.Card(priv, "What gets shared");
-        privCard.Margin = new Thickness(0, 14, 0, 0);
-        body.Children.Add(privCard);
-
-        _host.Children.Add(new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Content = body, Focusable = false });
     }
 
     // ───────────────────────── Chat
 
     private void BuildChat()
     {
-        _share = Kit.Switch(Settings.Current.AssistantSharePcDetails, "Let the Assistant read your PC's readings, tweak states, top apps and VYTRIX change history.");
-        _share.Checked += (_, _) => SetShare(true);
-        _share.Unchecked += (_, _) => SetShare(false);
-        var shareLabel = new TextBlock { Text = "Share PC details", FontSize = 12.5, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(8, 0, 16, 0), Foreground = Ui.Res("TextDimBrush") };
-        var newChat = Ui.IconButton("IcoRefresh", "New chat", "Ghost");
-        newChat.Click += (_, _) => { if (_busy) return; _session?.Reset(); ShowWelcome(); };
-        var keyBtn = Ui.IconButton("IcoSettings", "Key", "Ghost");
-        keyBtn.Margin = new Thickness(8, 0, 0, 0);
-        keyBtn.ToolTip = "Remove or replace your Anthropic API key";
-        keyBtn.Click += async (_, _) =>
+        var chip = UseClaude
+            ? Ui.Badge("Claude  ·  your key", "AccentHoverBrush", "AccentSoftBrush")
+            : Ui.Badge($"Free  ·  on this PC  ·  {CurrentModel.Name}", "GoodBrush", "GoodSoftBrush");
+        chip.VerticalAlignment = VerticalAlignment.Center;
+        chip.ToolTip = UseClaude ? "Answers come from Claude, billed to your Anthropic key." : "Answers come from an AI model running on this PC. Nothing leaves your computer.";
+        var items = new List<UIElement> { chip };
+        if (UseClaude)
         {
-            if (_busy) return;
-            if (!await Shell.ConfirmAsync("Remove your API key?", "VYTRIX will delete the key stored on this PC and turn the Assistant off. The key itself keeps working in your Anthropic account until you revoke it there.", "Remove key", danger: true)) return;
-            AssistantKey.Delete();
-            _session = null;
-            _chat.Children.Clear();
-            Render();
-        };
-        HeaderActions.Children.Add(Kit.Row(_share, shareLabel, newChat, keyBtn));
+            var share = Kit.Switch(Settings.Current.AssistantSharePcDetails, "Let Claude read your PC's readings, tweak states, top apps and VYTRIX change history.");
+            share.Margin = new Thickness(16, 0, 0, 0);
+            share.Checked += (_, _) => SetShare(true);
+            share.Unchecked += (_, _) => SetShare(false);
+            items.Add(share);
+            items.Add(new TextBlock { Text = "Share PC details", FontSize = 12.5, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(8, 0, 0, 0), Foreground = Ui.Res("TextDimBrush") });
+        }
+        var newChat = Ui.IconButton("IcoRefresh", "New chat", "Ghost");
+        newChat.Margin = new Thickness(16, 0, 0, 0);
+        newChat.Click += (_, _) => { if (_busy) return; _claude?.Reset(); _local?.Reset(); ShowWelcome(); };
+        items.Add(newChat);
+        var settings = Ui.IconButton("IcoSettings", "AI settings", "Ghost");
+        settings.Margin = new Thickness(8, 0, 0, 0);
+        settings.ToolTip = "Switch between free local AI and Claude, or change the model";
+        settings.Click += async (_, _) => { if (_busy) return; _showSetup = true; await RenderAsync(); };
+        items.Add(settings);
+        var row = new StackPanel { Orientation = Orientation.Horizontal };
+        foreach (var i in items) row.Children.Add(i);
+        HeaderActions.Children.Add(row);
 
         _host.RowDefinitions.Add(new RowDefinition());
         _host.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
@@ -155,6 +349,8 @@ public sealed class AssistantPage : PageBase
         var bar = new Grid { Margin = new Thickness(32, 0, 32, 22) };
         bar.ColumnDefinitions.Add(new ColumnDefinition());
         bar.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        if (_input.Parent is Panel old) old.Children.Remove(_input);
+        if (_send.Parent is Panel old2) old2.Children.Remove(_send);
         bar.Children.Add(_input);
         _send.VerticalAlignment = VerticalAlignment.Bottom;
         _send.Height = 44;
@@ -163,14 +359,14 @@ public sealed class AssistantPage : PageBase
         Grid.SetRow(bar, 2);
         _host.Children.Add(bar);
 
-        if (_chat.Children.Count == 0) ShowWelcome();
+        if (_chat.Children.Count == 0 || (UseClaude ? _claude!.TurnCount : _local!.TurnCount) == 0) ShowWelcome();
     }
 
     private void SetShare(bool on)
     {
         Settings.Current.AssistantSharePcDetails = on;
         Settings.Save();
-        Shell.Toast(on ? "The Assistant can now read your PC's details." : "PC details won't be shared. Answers will be more general.", ToastKind.Info);
+        Shell.Toast(on ? "Claude can now read your PC's details." : "PC details won't be shared with Claude. Answers will be more general.", ToastKind.Info);
     }
 
     private void ShowWelcome()
@@ -180,7 +376,13 @@ public sealed class AssistantPage : PageBase
         var badge = new Border { Width = 56, Height = 56, CornerRadius = new CornerRadius(16), Background = Ui.Res("AccentSoftBrush"), HorizontalAlignment = HorizontalAlignment.Center, Child = Ui.IconPath("IcoSparkle", 26, "AccentHoverBrush") };
         hero.Children.Add(badge);
         hero.Children.Add(new TextBlock { Text = "How can I help your PC today?", Style = Ui.Style("H2"), FontSize = 20, HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 14, 0, 6) });
-        hero.Children.Add(new TextBlock { Text = "I can check your PC, explain any setting, and suggest changes as buttons. Nothing changes unless you click.", Style = Ui.Style("Muted"), TextAlignment = TextAlignment.Center, TextWrapping = TextWrapping.Wrap });
+        hero.Children.Add(new TextBlock
+        {
+            Text = UseClaude
+                ? "I can check your PC, explain any setting, and suggest changes as buttons. Nothing changes unless you click."
+                : "I run right here on your PC, for free. I can check your PC, explain any setting, and suggest changes as buttons. Nothing changes unless you click.",
+            Style = Ui.Style("Muted"), TextAlignment = TextAlignment.Center, TextWrapping = TextWrapping.Wrap,
+        });
         _chat.Children.Add(hero);
         var grid = Kit.Grid(240, 2, 10);
         grid.MaxWidth = 640;
@@ -191,30 +393,34 @@ public sealed class AssistantPage : PageBase
             grid.Children.Add(b);
         }
         _chat.Children.Add(grid);
-        _chat.Children.Add(new TextBlock { Text = "Claude can make mistakes. Check important changes before you confirm them.", Style = Ui.Style("Muted"), FontSize = 11, HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 16, 0, 0) });
+        _chat.Children.Add(new TextBlock { Text = "AI can make mistakes. Check important changes before you confirm them.", Style = Ui.Style("Muted"), FontSize = 11, HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 16, 0, 0) });
     }
 
     private async Task SendOrStopAsync()
     {
         if (_busy) { _cts?.Cancel(); return; }
         var text = _input.Text.Trim();
-        if (text.Length == 0 || _session is null) return;
-        if (_session.TurnCount == 0) _chat.Children.Clear();
+        bool claude = UseClaude;
+        if (text.Length == 0 || (claude ? _claude is null : _local is null)) return;
+        if ((claude ? _claude!.TurnCount : _local!.TurnCount) == 0) _chat.Children.Clear();
         _input.Clear();
         AddUser(text);
-        SetBusy(true, "Thinking…");
+        SetBusy(true, claude ? "Thinking…" : "Thinking… (the first answer can take a little longer while the model loads)");
         _cts = new CancellationTokenSource();
+        var ct = _cts.Token;
         try
         {
             var progress = new Progress<string>(s => _status.Text = s);
-            var reply = await Task.Run(() => _session.SendAsync(text, Settings.Current.AssistantSharePcDetails, progress, _cts.Token));
+            var reply = claude
+                ? await Task.Run(() => _claude!.SendAsync(text, Settings.Current.AssistantSharePcDetails, progress, ct))
+                : await Task.Run(() => _local!.SendAsync(text, progress, ct));
             AddAssistant(reply);
         }
         catch (Exception ex)
         {
             Log.Warn("assistant", $"Request failed: {ex.GetType().Name}");
-            AddError(AssistantSession.Describe(ex));
-            if (ex is not OperationCanceledException) _session.Reset();   // a failed turn can leave half a tool exchange behind
+            AddError(claude ? AssistantSession.Describe(ex) : LocalAssistant.Describe(ex));
+            if (ex is not OperationCanceledException) { _claude?.Reset(); _local?.Reset(); }   // a failed turn can leave half a tool exchange behind
         }
         finally
         {
@@ -315,7 +521,9 @@ public sealed class AssistantPage : PageBase
 
     // ───────────────────────── Rendering helpers
 
-    /// <summary>Paragraphs and "- " / "1. " lists, with **bold** spans. Claude is asked to keep formatting light.</summary>
+    private static string Capitalize(string s) => s.Length == 0 ? s : char.ToUpperInvariant(s[0]) + s[1..];
+
+    /// <summary>Paragraphs and "- " / "1. " lists, with **bold** spans. The AI is asked to keep formatting light.</summary>
     internal static IEnumerable<FrameworkElement> Markdownish(string text)
     {
         foreach (var raw in text.Replace("\r\n", "\n").Split("\n\n"))
@@ -351,7 +559,7 @@ public sealed class AssistantPage : PageBase
         for (int i = 0; i < parts.Length; i++)
         {
             if (parts[i].Length == 0) continue;
-            var piece = parts[i].Replace("`", "");
+            var piece = parts[i].Replace("`", "").Replace("*", "");   // single-asterisk italics aren't rendered; drop the markers
             tb.Inlines.Add(i % 2 == 1 ? new Run(piece) { FontWeight = FontWeights.SemiBold } : new Run(piece));
         }
         return tb;
@@ -366,9 +574,9 @@ public sealed class AssistantPage : PageBase
         return tb;
     }
 
-    private static Grid Step(int n, string text)
+    private static Grid StepRow(int n, string title, TextBlock state, Thickness? margin = null)
     {
-        var g = new Grid { Margin = new Thickness(0, 0, 0, 10) };
+        var g = new Grid { Margin = margin ?? new Thickness(0, 4, 0, 0) };
         g.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         g.ColumnDefinitions.Add(new ColumnDefinition());
         g.Children.Add(new Border
@@ -376,9 +584,12 @@ public sealed class AssistantPage : PageBase
             Width = 24, Height = 24, CornerRadius = new CornerRadius(12), Background = Ui.Res("AccentSoftBrush"), VerticalAlignment = VerticalAlignment.Top, Margin = new Thickness(0, 0, 12, 0),
             Child = new TextBlock { Text = n.ToString(), FontSize = 12, FontWeight = FontWeights.SemiBold, Foreground = Ui.Res("AccentHoverBrush"), HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center },
         });
-        var tb = new TextBlock { Text = text, TextWrapping = TextWrapping.Wrap, FontSize = 13, LineHeight = 20 };
-        Grid.SetColumn(tb, 1);
-        g.Children.Add(tb);
+        var col = new StackPanel();
+        col.Children.Add(new TextBlock { Text = title, Style = Ui.Style("H3") });
+        state.Margin = new Thickness(0, 3, 0, 0);
+        col.Children.Add(state);
+        Grid.SetColumn(col, 1);
+        g.Children.Add(col);
         return g;
     }
 }

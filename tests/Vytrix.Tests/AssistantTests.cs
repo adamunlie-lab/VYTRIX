@@ -14,7 +14,7 @@ namespace Vytrix.Tests;
 /// </summary>
 public class AssistantTests
 {
-    private sealed class FakeClaude : IDisposable
+    internal sealed class FakeClaude : IDisposable
     {
         private readonly HttpListener _listener = new();
         private readonly Queue<(int Status, string Body)> _replies = new();

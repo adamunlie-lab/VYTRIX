@@ -303,13 +303,16 @@ public sealed class AppSettings
     public string CustomProfilePowerPlan { get; set; } = "keep";   // keep | balanced | performance
     /// <summary>Let the assistant read this PC's readings, tweak states, top apps and change history.</summary>
     public bool AssistantSharePcDetails { get; set; } = true;
+    /// <summary>"local" = free AI on this PC through Ollama; "claude" = Claude with the user's own key.</summary>
+    public string AssistantMode { get; set; } = "local";
+    public string AssistantLocalModel { get; set; } = "qwen3:4b";
 }
 
 /// <summary>The VYTRIX Terms of Agreement (legal\TERMS.txt, embedded at build time).</summary>
 public static class Terms
 {
     /// <summary>Bump when the terms text changes materially; users are asked to accept again.</summary>
-    public const string Version = "1.2";   // 1.1: automatic update checks via GitHub; 1.2: optional AI assistant
+    public const string Version = "1.3";   // 1.1: GitHub update checks; 1.2: AI assistant (Claude); 1.3: free local AI mode
 
     public static string Text { get; } = Load();
 

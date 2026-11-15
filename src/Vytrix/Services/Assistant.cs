@@ -104,7 +104,16 @@ public sealed class AssistantSession
         Be honest about trade-offs and about what won't help. Keep answers short: a sentence or two of answer first, then at most a few bullets. No headings, no tables, and no links to websites.
         """;
 
-    private static readonly BetaToolUnion[] Tools =
+    /// <summary>One tool, described once and shared by the Claude and local engines.</summary>
+    public sealed record ToolSpec(string Name, string Description, object Properties, string[] Required)
+    {
+        public Dictionary<string, JsonElement> PropertyMap =>
+            JsonSerializer.SerializeToElement(Properties).EnumerateObject().ToDictionary(p => p.Name, p => p.Value.Clone());
+    }
+
+    private static ToolSpec Tool(string name, string description, object properties, string[] required) => new(name, description, properties, required);
+
+    public static readonly ToolSpec[] ToolSpecs =
     [
         Tool("get_pc_overview", "Live readings and hardware for this PC: CPU, GPU, RAM, disks, temperatures (when available), Windows version, power plan, admin mode, startup app and process counts.", new { }, []),
         Tool("list_tweaks", "Every VYTRIX tweak with its id, name, component, current state on this PC, risk, and whether it needs admin.", new { }, []),
@@ -135,16 +144,12 @@ public sealed class AssistantSession
             }, ["actions"]),
     ];
 
-    private static BetaToolUnion Tool(string name, string description, object properties, string[] required) => new BetaTool
+    private static readonly BetaToolUnion[] Tools = ToolSpecs.Select(s => (BetaToolUnion)new BetaTool
     {
-        Name = name,
-        Description = description,
-        InputSchema = new()
-        {
-            Properties = JsonSerializer.SerializeToElement(properties).EnumerateObject().ToDictionary(p => p.Name, p => p.Value.Clone()),
-            Required = required,
-        },
-    };
+        Name = s.Name,
+        Description = s.Description,
+        InputSchema = new() { Properties = s.PropertyMap, Required = s.Required },
+    }).ToArray();
 
     /// <summary>Sends one message and runs the tool loop until Claude answers.</summary>
     public async Task<AssistantReply> SendAsync(string text, bool sharePcDetails, IProgress<string>? status = null, CancellationToken ct = default)
@@ -220,7 +225,7 @@ public sealed class AssistantSession
         _ => "Something went wrong talking to Claude. Try again.",
     };
 
-    private static string StatusFor(string tool) => tool switch
+    internal static string StatusFor(string tool) => tool switch
     {
         "get_pc_overview" => "Checking your PC…",
         "list_tweaks" or "get_tweak" => "Looking at your tweaks…",

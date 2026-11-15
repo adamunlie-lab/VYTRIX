@@ -40,13 +40,13 @@ function WaitWin { $w = $null; for ($i = 0; $i -lt 40 -and -not $w; $i++) { Star
 $fresh = New-QaDataDir
 $p = Launch
 $w = WaitWin
-Check 'First run shows Terms of Agreement' ($null -ne (FindByName $w 'VYTRIX Terms of Agreement (v1.2)'))
+Check 'First run shows Terms of Agreement' ($null -ne (FindByName $w 'VYTRIX Terms of Agreement (v1.3)'))
 $accept = FindButtonContaining $w 'Accept'
 Check 'Accept disabled until box is ticked' ($accept -and -not $accept.Current.IsEnabled)
 Shot 'terms-first-run'
 Invoke (FindButtonContaining $w 'Decline')
 Check 'Decline exits the app' ($p.WaitForExit(5000))
-Check 'Declining does not record acceptance' (-not ((Get-Content (Join-Path $fresh 'settings.json') -ErrorAction SilentlyContinue) -match '"acceptedTermsVersion": "1.2"'))
+Check 'Declining does not record acceptance' (-not ((Get-Content (Join-Path $fresh 'settings.json') -ErrorAction SilentlyContinue) -match '"acceptedTermsVersion": "1.3"'))
 $p = Launch
 $w = WaitWin
 $box = FindByName $w 'I have read and agree to the VYTRIX Terms of Agreement'
@@ -56,12 +56,12 @@ $accept = FindButtonContaining $w 'Accept'
 Check 'Ticking the box enables Accept' ($accept.Current.IsEnabled)
 Invoke $accept
 Start-Sleep -Milliseconds 800
-Check 'Accepting records version 1.2' ((Get-Content (Join-Path $fresh 'settings.json') -Raw) -match '"acceptedTermsVersion": "1.2"')
+Check 'Accepting records version 1.3' ((Get-Content (Join-Path $fresh 'settings.json') -Raw) -match '"acceptedTermsVersion": "1.3"')
 Check 'App stays open after accepting' (-not $p.HasExited)
 $p.CloseMainWindow() | Out-Null; $p.WaitForExit(5000) | Out-Null
 $p = Launch
 $w = WaitWin
-Check 'Terms not shown again once accepted' ($null -eq (FindByName $w 'VYTRIX Terms of Agreement (v1.2)'))
+Check 'Terms not shown again once accepted' ($null -eq (FindByName $w 'VYTRIX Terms of Agreement (v1.3)'))
 $p.CloseMainWindow() | Out-Null; $p.WaitForExit(5000) | Out-Null
 
 # Remaining checks run against an isolated folder with the terms pre-accepted.
@@ -97,7 +97,10 @@ foreach ($n in 'Overview','Assistant','Optimization','Gaming','Network','Memory'
 
 # 3a. Assistant without a key shows setup (no network, nothing is sent)
 (FindByName (Win) 'Assistant').GetCurrentPattern([Windows.Automation.SelectionItemPattern]::Pattern).Select(); Start-Sleep -Seconds 1
-Check 'Assistant: setup shown when no key is stored' ($null -ne (FindByName (Win) 'Meet your VYTRIX Assistant') -and $null -ne (FindButtonContaining (Win) 'Save key and start'))
+Start-Sleep -Seconds 2   # it checks whether the local AI is set up
+$setup = $null -ne (FindByName (Win) 'Free AI on your PC') -and $null -ne (FindByName (Win) 'Optional: Claude')
+$chat = $null -ne (FindByName (Win) 'How can I help your PC today?')
+Check ("Assistant: " + $(if ($chat) { 'free local chat ready (Ollama + model present)' } else { 'free setup shown first' })) ($setup -or $chat)
 Shot 'assistant-setup'
 
 # 3b. Help page: quick start, topics, and help topics in global search
