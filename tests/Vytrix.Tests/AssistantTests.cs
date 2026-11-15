@@ -19,6 +19,7 @@ public class AssistantTests
         private readonly HttpListener _listener = new();
         private readonly Queue<(int Status, string Body)> _replies = new();
         public List<(Dictionary<string, string> Headers, JsonDocument Body)> Requests { get; } = [];
+        public List<string> Paths { get; } = [];
         public string Url { get; }
 
         public FakeClaude(params (int, string)[] replies)
@@ -40,7 +41,7 @@ public class AssistantTests
                 using var sr = new StreamReader(ctx.Request.InputStream);
                 var body = await sr.ReadToEndAsync();
                 var headers = ctx.Request.Headers.AllKeys.Where(k => k is not null).ToDictionary(k => k!.ToLowerInvariant(), k => ctx.Request.Headers[k]!);
-                lock (Requests) Requests.Add((headers, JsonDocument.Parse(body)));
+                lock (Requests) { Requests.Add((headers, JsonDocument.Parse(body))); Paths.Add(ctx.Request.Url!.AbsolutePath); }
                 var (status, reply) = _replies.Count > 0 ? _replies.Dequeue() : (500, """{"type":"error","error":{"type":"api_error","message":"no more replies"}}""");
                 var bytes = Encoding.UTF8.GetBytes(reply);
                 ctx.Response.StatusCode = status;

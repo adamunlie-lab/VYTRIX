@@ -13,28 +13,48 @@ namespace Vytrix.Services;
 /// </summary>
 public sealed class GeminiAssistant
 {
-    /// <summary>Free on Google's Standard tier (checked against ai.google.dev pricing, November 2026).</summary>
-    public const string DefaultModel = "gemini-3.8-flash";
+    /// <summary>
+    /// Free models on Google's Standard tier (ai.google.dev pricing, November 2026), in the order tried.
+    /// gemini-3.8-flash is the newest but was overloaded for free users (503 "high demand" and requests that
+    /// never answered), while 3.6-flash and 3.5-flash-lite answered VYTRIX's real request in about a second.
+    /// </summary>
+    public static readonly string[] Models = ["gemini-3.6-flash", "gemini-3.5-flash-lite", "gemini-3.8-flash"];
+    public static string DefaultModel => Models[0];
     public const string KeyPage = "https://aistudio.google.com/apikey";
     private const int MaxToolRounds = 8;
 
     private static readonly HttpClient Http = new() { Timeout = Timeout.InfiniteTimeSpan };
-    /// <summary>Per request; a whole answer can take several requests.</summary>
-    internal static TimeSpan RequestTimeout { get; set; } = TimeSpan.FromSeconds(90);
+    /// <summary>Per request; after this the next free model is tried.</summary>
+    internal static TimeSpan RequestTimeout { get; set; } = TimeSpan.FromSeconds(30);
     private readonly List<JsonObject> _contents = [];
     private readonly string _key;
     private readonly string _baseUrl;
+    private readonly string[] _models;
+    private int _modelIndex;
 
-    public string Model { get; }
+    /// <summary>The model currently in use (it stays on whichever one last worked).</summary>
+    public string Model => _models[_modelIndex];
     public int TurnCount { get; private set; }
     internal int MessageCount => _contents.Count;
 
-    public GeminiAssistant(string apiKey, string model = DefaultModel, string? baseUrl = null)
+    public GeminiAssistant(string apiKey, string? model = null, string? baseUrl = null)
     {
         _key = apiKey;
-        Model = model;
+        _models = model is null ? Models : [model];
         _baseUrl = (baseUrl ?? "https://generativelanguage.googleapis.com").TrimEnd('/');
     }
+
+    internal GeminiAssistant(string apiKey, string[] models, string? baseUrl)
+    {
+        _key = apiKey;
+        _models = models;
+        _baseUrl = (baseUrl ?? "https://generativelanguage.googleapis.com").TrimEnd('/');
+    }
+
+    /// <summary>Busy, rate-limited, timed out or retired: worth trying the next free model.</summary>
+    internal static bool TryNextModel(GeminiException g) =>
+        g.Status is HttpStatusCode.ServiceUnavailable or HttpStatusCode.TooManyRequests or HttpStatusCode.RequestTimeout
+            or HttpStatusCode.InternalServerError or HttpStatusCode.BadGateway or HttpStatusCode.GatewayTimeout or HttpStatusCode.NotFound;
 
     public void Reset() { _contents.Clear(); TurnCount = 0; }
 
@@ -62,6 +82,27 @@ public sealed class GeminiAssistant
     {
         _contents.Add(new JsonObject { ["role"] = "user", ["parts"] = new JsonArray(new JsonObject { ["text"] = text }) });
         TurnCount++;
+        int turnStart = _contents.Count;
+        while (true)
+        {
+            try { return await RunTurnAsync(sharePcDetails, status, ct); }
+            catch (GeminiException g) when (TryNextModel(g) && _modelIndex < _models.Length - 1)
+            {
+                Log.Warn("assistant", $"{Model} unavailable ({(int)g.Status}); trying {_models[_modelIndex + 1]}.");
+                _modelIndex++;
+                status?.Report("Gemini is busy, trying another free model…");
+                // Restart this question on the next model. Thought signatures belong to the model that made
+                // them, so drop this turn's partial work and the signatures on earlier turns.
+                if (_contents.Count > turnStart) _contents.RemoveRange(turnStart, _contents.Count - turnStart);
+                foreach (var c in _contents)
+                    if (c["parts"] is JsonArray parts)
+                        foreach (var p in parts) (p as JsonObject)?.Remove("thoughtSignature");
+            }
+        }
+    }
+
+    private async Task<AssistantReply> RunTurnAsync(bool sharePcDetails, IProgress<string>? status, CancellationToken ct)
+    {
         var actions = new List<AssistantAction>();
         string lastText = "";
 
@@ -133,6 +174,8 @@ public sealed class GeminiAssistant
             {
                 var reply = lastText.Length > 0 ? lastText : "Done.";
                 if (finish == "MAX_TOKENS") reply += "\n\n(Reply cut short.)";
+                // The lighter fallback model sometimes recommends things without calling suggest_actions.
+                if (actions.Count == 0) actions.AddRange(LocalAssistant.InferActions(reply));
                 return new AssistantReply(reply, actions);
             }
 
@@ -170,12 +213,12 @@ public sealed class GeminiAssistant
     /// <summary>Plain-language message for a failure; never includes the key.</summary>
     public static string Describe(Exception ex) => ex switch
     {
-        GeminiException { Status: HttpStatusCode.RequestTimeout } => "Gemini didn't answer within 90 seconds. Try again, or ask a shorter question.",
+        GeminiException { Status: HttpStatusCode.RequestTimeout or HttpStatusCode.ServiceUnavailable } => "Google's free Gemini models are all busy right now. Try again in a few minutes, or switch to the free local AI in AI settings.",
         GeminiException { Status: HttpStatusCode.TooManyRequests } => "You've reached Gemini's free limit for now. Wait a minute (or until tomorrow for the daily limit), or switch to the free local AI in AI settings.",
         GeminiException g when g.Status is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden
             || (g.Status == HttpStatusCode.BadRequest && (g.Detail ?? "").Contains("API key", StringComparison.OrdinalIgnoreCase))
             => "Your Gemini API key was rejected. Check it in AI settings, or create a new one in Google AI Studio.",
-        GeminiException { Status: HttpStatusCode.NotFound } => $"Google doesn't offer the {DefaultModel} model to this key. It may have been renamed; check for a VYTRIX update.",
+        GeminiException { Status: HttpStatusCode.NotFound } => "Google no longer offers VYTRIX's free Gemini models to this key. Check for a VYTRIX update.",
         GeminiException { Status: HttpStatusCode.BadRequest } g when (g.Detail ?? "").Contains("location", StringComparison.OrdinalIgnoreCase)
             => "Gemini's free tier isn't available in your region. Use the free local AI in AI settings instead.",
         GeminiException g when (int)g.Status >= 500 => "Gemini is busy right now. Try again in a minute.",
