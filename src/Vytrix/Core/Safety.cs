@@ -285,6 +285,8 @@ public sealed class AppSettings
     /// <summary>Set once the Cherry Blossom theme has been made the default for an existing install.</summary>
     public bool CherryBlossomIntroduced { get; set; }
     public bool ShowFallingPetals { get; set; } = true;
+    /// <summary>Twinkling lights around the window's edge in the Christmas theme.</summary>
+    public bool ShowChristmasLights { get; set; } = true;
     public bool CreateRestorePointBeforeProfiles { get; set; } = true;
     public bool ExportRegistryBeforeChanges { get; set; } = true;
     public bool ConfirmBeforeApplying { get; set; } = true;

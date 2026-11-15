@@ -154,6 +154,7 @@ public partial class MainWindow : Window
     private PetalField? _petals;
     private ChristmasTree? _xmas;
     private SnowField? _snow;
+    private ChristmasLights? _lights;
     private FireworksSky? _fireworks;
     private SnowField? _glitter;
     private Viewbox? _sakuraBox, _xmasBox, _nyBox;
@@ -320,6 +321,10 @@ public partial class MainWindow : Window
             SceneHost.Children.Add(_xmasBox);
             _snow = new SnowField();
             PetalHost.Children.Add(_snow);
+            // Lights along the window's edge, above the pages but below dialogs and toasts.
+            _lights = new ChristmasLights();
+            Grid.SetColumnSpan(_lights, 2);
+            RootGrid.Children.Insert(RootGrid.Children.IndexOf(PetalHost) + 1, _lights);
         }
         if (theme == ThemeManager.NewYear && _fireworks is null)
         {
@@ -359,6 +364,8 @@ public partial class MainWindow : Window
         if (_petals is not null) { _petals.Visibility = sakura && particles ? Visibility.Visible : Visibility.Collapsed; _petals.SetRunning(animate && sakura && particles); }
         if (_snow is not null) { _snow.Visibility = xmas && particles ? Visibility.Visible : Visibility.Collapsed; _snow.SetRunning(animate && xmas && particles); }
         if (_glitter is not null) { _glitter.Visibility = ny && particles ? Visibility.Visible : Visibility.Collapsed; _glitter.SetRunning(animate && ny && particles); }
+        bool lights = xmas && Settings.Current.ShowChristmasLights;
+        if (_lights is not null) { _lights.Visibility = lights ? Visibility.Visible : Visibility.Collapsed; _lights.SetRunning(animate && lights); }
         _sakura?.SetRunning(animate && sakura && !overview);
         _xmas?.SetRunning(animate && xmas && !overview);
         _fireworks?.SetRunning(animate && ny && !overview);

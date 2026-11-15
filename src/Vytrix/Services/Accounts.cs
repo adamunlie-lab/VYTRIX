@@ -272,7 +272,7 @@ public sealed class AccountService
         var s = Settings.Current;
         var appearance = new JsonObject
         {
-            ["theme"] = s.Theme, ["accent"] = s.Accent, ["musicVolume"] = s.MusicVolume, ["showFallingPetals"] = s.ShowFallingPetals,
+            ["theme"] = s.Theme, ["accent"] = s.Accent, ["musicVolume"] = s.MusicVolume, ["showFallingPetals"] = s.ShowFallingPetals, ["showChristmasLights"] = s.ShowChristmasLights,
             ["reduceMotion"] = s.ReduceMotion, ["seasonalThemes"] = s.SeasonalThemes,
         };
         // A friendly label so you can tell your PCs apart, without sending the computer's name.
@@ -337,6 +337,7 @@ public sealed class AccountService
         if (a["accent"]?.GetValue<string>() is { } accent && Vytrix.Controls.ThemeManager.Accents.Any(x => x.Name == accent)) s.Accent = accent;
         if (a["musicVolume"]?.GetValue<double>() is { } v && v is >= 0 and <= 1) s.MusicVolume = v;
         if (a["showFallingPetals"]?.GetValueKind() is JsonValueKind.True or JsonValueKind.False) s.ShowFallingPetals = a["showFallingPetals"]!.GetValue<bool>();
+        if (a["showChristmasLights"]?.GetValueKind() is JsonValueKind.True or JsonValueKind.False) s.ShowChristmasLights = a["showChristmasLights"]!.GetValue<bool>();
         if (a["reduceMotion"]?.GetValueKind() is JsonValueKind.True or JsonValueKind.False) s.ReduceMotion = a["reduceMotion"]!.GetValue<bool>();
         if (a["seasonalThemes"]?.GetValueKind() is JsonValueKind.True or JsonValueKind.False) s.SeasonalThemes = a["seasonalThemes"]!.GetValue<bool>();
         Settings.Save();

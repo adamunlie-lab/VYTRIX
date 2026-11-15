@@ -60,6 +60,12 @@ public sealed class SignInWindow : Window
         right.Children.Add(new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Content = _form, Margin = new Thickness(0, 46, 0, 0), Focusable = false });
         right.Children.Add(ChromeButtons());
         root.Children.Add(right);
+        if (ThemeManager.Current == ThemeManager.Christmas && Settings.Current.ShowChristmasLights)
+        {
+            _lights = new ChristmasLights();
+            Grid.SetColumnSpan(_lights, 2);
+            root.Children.Add(_lights);
+        }
         StateChanged += (_, _) => root.Margin = WindowState == WindowState.Maximized ? new Thickness(7) : new Thickness(0);
         Content = root;
 
@@ -119,9 +125,14 @@ public sealed class SignInWindow : Window
         });
     }
 
-    private void UpdateScene() =>
-        _setSceneRunning?.Invoke(IsActive && WindowState != WindowState.Minimized && !Settings.Current.ReduceMotion);
+    private ChristmasLights? _lights;
 
+    private void UpdateScene()
+    {
+        bool animate = IsActive && WindowState != WindowState.Minimized && !Settings.Current.ReduceMotion;
+        _setSceneRunning?.Invoke(animate);
+        _lights?.SetRunning(animate);
+    }
     private StackPanel ChromeButtons()
     {
         var sp = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Top };

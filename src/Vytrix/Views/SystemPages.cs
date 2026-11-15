@@ -436,6 +436,7 @@ public sealed class SettingsPage : PageBase
         }
         look.Children.Add(accents);
         look.Children.Add(Option("Falling petals, snow & glitter", "Petals (Cherry Blossom), snow (Christmas) or gold glitter (New Year) drift across the window.", s.ShowFallingPetals, v => s.ShowFallingPetals = v));
+        look.Children.Add(Option("Christmas lights", "A string of twinkling lights around the edge of the window in the Christmas theme. They glow steadily when Reduce motion is on.", s.ShowChristmasLights, v => s.ShowChristmasLights = v));
         look.Children.Add(Option("Seasonal themes", "Switches Christmas to New Year after Boxing Day, and back to Graphite after 6 January. A theme you pick yourself is never changed.", s.SeasonalThemes, v => s.SeasonalThemes = v));
         look.Children.Add(new TextBlock { Text = "CAROL VOLUME", Style = Ui.Style("Label"), Margin = new Thickness(0, 14, 0, 6) });
         var vol = new ComboBox { Width = 200, HorizontalAlignment = HorizontalAlignment.Left, ToolTip = "Music-box carols in the Christmas theme. They never start on their own." };
