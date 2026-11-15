@@ -19,8 +19,9 @@ namespace Vytrix.Services;
 /// </summary>
 public static class AccountConfig
 {
-    public const string SupabaseUrl = "";
-    public const string SupabaseAnonKey = "";
+    public const string SupabaseUrl = "https://inlogccnzhtxxasmcjiq.supabase.co";
+    /// <summary>Supabase "publishable" key: public by design; Row Level Security protects the data.</summary>
+    public const string SupabaseAnonKey = "sb_publishable_1AkeH7Y86c1Bdj4OXIDBjQ_bwPnnr5z";
 
     public static string Url => Environment.GetEnvironmentVariable("VYTRIX_ACCOUNTS_URL") is { Length: > 0 } u ? u.TrimEnd('/') : SupabaseUrl.TrimEnd('/');
     public static string AnonKey => Environment.GetEnvironmentVariable("VYTRIX_ACCOUNTS_KEY") is { Length: > 0 } k ? k : SupabaseAnonKey;
