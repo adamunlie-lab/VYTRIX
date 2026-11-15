@@ -63,6 +63,59 @@ public class AccountTests
     }
 
     [Fact]
+    public async Task Google_sign_in_keeps_the_name_and_picture_across_restarts()
+    {
+        var googleTokens = JsonSerializer.Serialize(new
+        {
+            access_token = "access-1", refresh_token = "refresh-1", token_type = "bearer", expires_in = 3600,
+            user = new
+            {
+                id = "11111111-2222-3333-4444-555555555555", email = "gamer@example.com", app_metadata = new { provider = "google" },
+                user_metadata = new { full_name = "Sam Gamer", avatar_url = "https://lh3.googleusercontent.com/a/photo=s96-c" },
+            },
+        });
+        using var fake = new AssistantTests.FakeClaude((200, googleTokens));
+        var (svc, store) = New(fake.Url);
+        await svc.SignInWithEmailAsync("gamer@example.com", "correct horse battery");
+        Assert.Equal("Sam Gamer", svc.Session!.DisplayName);
+        Assert.Equal("https://lh3.googleusercontent.com/a/photo=s96-c", svc.Session.AvatarUrl);
+
+        var restarted = new AccountService(fake.Url, AnonKey, store);
+        Assert.Equal("Sam Gamer", restarted.Session!.Name);                      // shown straight away, even offline
+        Assert.Equal("https://lh3.googleusercontent.com/a/photo=s96-c", restarted.Session.AvatarUrl);
+        store.Delete();
+    }
+
+    [Fact]
+    public async Task Email_accounts_are_named_after_the_email()
+    {
+        using var fake = new AssistantTests.FakeClaude((200, Tokens()));
+        var (svc, store) = New(fake.Url);
+        await svc.SignInWithEmailAsync("gamer@example.com", "correct horse battery");
+        Assert.Equal("gamer", svc.Session!.DisplayName);
+        Assert.Equal("", svc.Session.AvatarUrl);
+        store.Delete();
+    }
+
+    [Theory]
+    [InlineData("https://lh3.googleusercontent.com/a/x", true)]
+    [InlineData("http://example.com/x.png", false)]          // never over plain http
+    [InlineData("file:///C:/Windows/x.png", false)]          // never a local file
+    [InlineData("not a url", false)]
+    [InlineData("", false)]
+    public void Only_https_pictures_are_kept(string url, bool kept) =>
+        Assert.Equal(kept, AccountService.SafePictureUrl(url).Length > 0);
+
+    [Theory]
+    [InlineData("Sam Gamer", "SG")]
+    [InlineData("gamer99", "G")]
+    [InlineData("sam.gamer", "S")]
+    [InlineData("Anne Marie Smith", "AS")]
+    [InlineData("", "?")]
+    public void Initials_come_from_the_name(string name, string expected) =>
+        Assert.Equal(expected, Vytrix.Controls.Avatar.Initials(name));
+
+    [Fact]
     public async Task A_reset_code_sets_the_new_password_and_signs_in()
     {
         using var fake = new AssistantTests.FakeClaude((200, Tokens(access: "recovery-access")), (200, """{"id":"user-1"}"""));

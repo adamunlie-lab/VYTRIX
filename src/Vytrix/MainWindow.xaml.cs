@@ -49,6 +49,10 @@ public partial class MainWindow : Window
         ];
         BuildNav();
         UpdateAdminState();
+
+        void OnAccountChanged() => Dispatcher.BeginInvoke(BuildTitleTools);
+        AccountService.Instance.Changed += OnAccountChanged;
+        Closed += (_, _) => AccountService.Instance.Changed -= OnAccountChanged;
         BuildScene();
         BuildSplash();
         StateChanged += (_, _) => RootGrid.Margin = WindowState == WindowState.Maximized ? new Thickness(7) : new Thickness(0);
@@ -223,6 +227,7 @@ public partial class MainWindow : Window
         var theme = PillButton("IcoPalette", ThemeManager.Current, "Change theme");
         theme.Click += (_, _) => ShowThemeMenu(theme);
         TitleTools.Children.Add(theme);
+        if (AccountButton() is { } account) TitleTools.Children.Add(account);
     }
 
     private void ShowThemeMenu(FrameworkElement anchor)
@@ -414,6 +419,31 @@ public partial class MainWindow : Window
             UpdateScene();
         }
         after?.Invoke(page);
+    }
+
+    // ───────────────────────── Account button (title bar)
+
+    /// <summary>Who's signed in (picture or initials, and first name), at the right of the title bar; clicking it opens Account.</summary>
+    private Button? AccountButton()
+    {
+        var s = AccountService.Instance.Session;
+        if (s is null) return null;
+        var sp = new StackPanel { Orientation = Orientation.Horizontal };
+        sp.Children.Add(new Avatar(s.DisplayName, s.AvatarUrl, 22));
+        var first = s.DisplayName.Split(' ')[0];
+        sp.Children.Add(new TextBlock
+        {
+            Text = first.Length > 14 ? first[..14] + "…" : first, FontSize = 12, Margin = new Thickness(7, 0, 0, 0),
+            Foreground = Ui.Res("TextDimBrush"), VerticalAlignment = VerticalAlignment.Center,
+        });
+        var b = new Button
+        {
+            Content = sp, Style = Ui.Style("Ghost"), Padding = new Thickness(4, 2, 11, 2), Margin = new Thickness(6, 0, 0, 0), Focusable = false,
+            ToolTip = s.Email.Length > 0 ? $"Signed in as {s.Email}\nClick to open your account" : "Open your account",
+        };
+        System.Windows.Automation.AutomationProperties.SetName(b, $"Account: {s.DisplayName}");
+        b.Click += (_, _) => Navigate("account");
+        return b;
     }
 
     // ───────────────────────── Admin / elevation

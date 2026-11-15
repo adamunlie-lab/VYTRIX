@@ -33,6 +33,13 @@ public sealed record AccountSession(string UserId, string Email, string Provider
 {
     public string AccessToken { get; init; } = "";
     public DateTime AccessExpires { get; init; }
+    /// <summary>The name the sign-in provider shares (e.g. Google), or "" for email accounts.</summary>
+    public string Name { get; init; } = "";
+    /// <summary>The provider's profile picture (https only), or "" when there isn't one.</summary>
+    public string AvatarUrl { get; init; } = "";
+
+    /// <summary>What to call the person: their name, else the part of their email before the @.</summary>
+    public string DisplayName => Name.Length > 0 ? Name : Email.Split('@')[0] is { Length: > 0 } local ? local : "Your account";
 }
 
 /// <summary>A sign-in method the server has turned on.</summary>
@@ -228,12 +235,27 @@ public sealed class AccountService
         int expiresIn = t?["expires_in"]?.GetValue<int>() ?? 3600;
         var user = t?["user"];
         var actualProvider = user?["app_metadata"]?["provider"]?.GetValue<string>() ?? provider;
+        var meta = user?["user_metadata"] as JsonObject;
         return new AccountSession(user?["id"]?.GetValue<string>() ?? "", user?["email"]?.GetValue<string>() ?? "", actualProvider, refresh)
         {
             AccessToken = access,
             AccessExpires = DateTime.UtcNow.AddSeconds(expiresIn - 60),
+            Name = Text(meta, "full_name", "name"),
+            AvatarUrl = SafePictureUrl(Text(meta, "avatar_url", "picture")),
         };
     }
+
+    private static string Text(JsonObject? o, params string[] keys)
+    {
+        foreach (var k in keys)
+            if (o?[k] is JsonValue v && v.TryGetValue<string>(out var s) && s.Trim().Length > 0)
+                return s.Trim().Length > 80 ? s.Trim()[..80] : s.Trim();
+        return "";
+    }
+
+    /// <summary>Only https picture links are kept, so VYTRIX never loads a picture over plain http or from a local path.</summary>
+    internal static string SafePictureUrl(string url) =>
+        Uri.TryCreate(url, UriKind.Absolute, out var u) && u.Scheme == Uri.UriSchemeHttps && url.Length < 1000 ? u.AbsoluteUri : "";
 
     private async Task<string> AccessTokenAsync(CancellationToken ct)
     {

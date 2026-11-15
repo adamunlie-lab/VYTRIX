@@ -37,10 +37,14 @@ public sealed class AccountPage : PageBase
     private async Task RenderSignedInAsync()
     {
         var s = Svc.Session!;
-        var who = new StackPanel();
+        var who = new StackPanel { Orientation = Orientation.Horizontal };
         var provider = AccountService.KnownProviders.FirstOrDefault(p => p.Id == s.Provider).Label ?? (s.Provider == "email" ? "email" : s.Provider);
-        who.Children.Add(new TextBlock { Text = s.Email.Length > 0 ? s.Email : "Signed in", Style = Ui.Style("H2") });
-        who.Children.Add(new TextBlock { Text = $"Signed in with {provider}", Style = Ui.Style("Muted"), Margin = new Thickness(0, 3, 0, 0) });
+        who.Children.Add(new Avatar(s.DisplayName, s.AvatarUrl, 52) { VerticalAlignment = VerticalAlignment.Center });
+        var names = new StackPanel { Margin = new Thickness(14, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
+        names.Children.Add(new TextBlock { Text = s.DisplayName, Style = Ui.Style("H2") });
+        if (s.Email.Length > 0 && s.Email != s.DisplayName) names.Children.Add(new TextBlock { Text = s.Email, Style = Ui.Style("Dim"), Margin = new Thickness(0, 2, 0, 0) });
+        names.Children.Add(new TextBlock { Text = $"Signed in with {provider}", Style = Ui.Style("Muted"), Margin = new Thickness(0, 2, 0, 0) });
+        who.Children.Add(names);
         var signOut = new Button { Content = "Sign out", Style = Ui.Style("Ghost") };
         signOut.Click += async (_, _) =>
         {
