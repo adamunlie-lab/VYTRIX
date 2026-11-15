@@ -18,7 +18,9 @@ public sealed class GeminiAssistant
     public const string KeyPage = "https://aistudio.google.com/apikey";
     private const int MaxToolRounds = 8;
 
-    private static readonly HttpClient Http = new() { Timeout = TimeSpan.FromMinutes(3) };
+    private static readonly HttpClient Http = new() { Timeout = Timeout.InfiniteTimeSpan };
+    /// <summary>Per request; a whole answer can take several requests.</summary>
+    internal static TimeSpan RequestTimeout { get; set; } = TimeSpan.FromSeconds(90);
     private readonly List<JsonObject> _contents = [];
     private readonly string _key;
     private readonly string _baseUrl;
@@ -70,15 +72,36 @@ public sealed class GeminiAssistant
                 ["systemInstruction"] = new JsonObject { ["parts"] = new JsonArray(new JsonObject { ["text"] = AssistantSession.SystemPrompt }) },
                 ["contents"] = new JsonArray(_contents.Select(c => (JsonNode)c.DeepClone()).ToArray()),
                 ["tools"] = ToolsJson(),
-                ["generationConfig"] = new JsonObject { ["maxOutputTokens"] = 8192 },
+                // gemini-3.8-flash thinks at "medium" by default before every reply, which made multi-step
+                // answers feel stuck; "low" is plenty for this kind of help and much quicker.
+                ["generationConfig"] = new JsonObject
+                {
+                    ["maxOutputTokens"] = 8192,
+                    ["thinkingConfig"] = new JsonObject { ["thinkingLevel"] = "low" },
+                },
             };
             using var msg = new HttpRequestMessage(HttpMethod.Post, $"{_baseUrl}/v1beta/models/{Model}:generateContent")
             {
                 Content = new StringContent(request.ToJsonString(), Encoding.UTF8, "application/json"),
             };
             msg.Headers.Add("x-goog-api-key", _key);
-            using var resp = await Http.SendAsync(msg, ct);
-            var body = await resp.Content.ReadAsStringAsync(ct);
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            timeout.CancelAfter(RequestTimeout);
+            HttpResponseMessage resp;
+            string body;
+            try
+            {
+                resp = await Http.SendAsync(msg, timeout.Token);
+                body = await resp.Content.ReadAsStringAsync(timeout.Token);
+            }
+            catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+            {
+                Log.Warn("assistant", $"Gemini round {round + 1} timed out after {sw.Elapsed.TotalSeconds:N0}s.");
+                throw new GeminiException(HttpStatusCode.RequestTimeout, null);
+            }
+            using var _ = resp;
+            Log.Info("assistant", $"Gemini round {round + 1}: HTTP {(int)resp.StatusCode} in {sw.Elapsed.TotalSeconds:N1}s.");
             if (!resp.IsSuccessStatusCode) throw new GeminiException(resp.StatusCode, ErrorMessage(body));
 
             var root = JsonNode.Parse(body);
@@ -147,6 +170,7 @@ public sealed class GeminiAssistant
     /// <summary>Plain-language message for a failure; never includes the key.</summary>
     public static string Describe(Exception ex) => ex switch
     {
+        GeminiException { Status: HttpStatusCode.RequestTimeout } => "Gemini didn't answer within 90 seconds. Try again, or ask a shorter question.",
         GeminiException { Status: HttpStatusCode.TooManyRequests } => "You've reached Gemini's free limit for now. Wait a minute (or until tomorrow for the daily limit), or switch to the free local AI in AI settings.",
         GeminiException g when g.Status is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden
             || (g.Status == HttpStatusCode.BadRequest && (g.Detail ?? "").Contains("API key", StringComparison.OrdinalIgnoreCase))

@@ -37,6 +37,7 @@ public class GeminiTests
         var (h0, b0) = fake.Requests[0];
         Assert.Equal(Key, h0["x-goog-api-key"]);
         var r0 = b0.RootElement;
+        Assert.Equal("low", r0.GetProperty("generationConfig").GetProperty("thinkingConfig").GetProperty("thinkingLevel").GetString());
         Assert.Contains("VYTRIX", r0.GetProperty("systemInstruction").GetProperty("parts")[0].GetProperty("text").GetString());
         var decls = r0.GetProperty("tools")[0].GetProperty("functionDeclarations");
         Assert.Equal(AssistantSession.ToolSpecs.Length, decls.GetArrayLength());
@@ -85,6 +86,26 @@ public class GeminiTests
         Assert.Contains("declined", reply.Text);
         Assert.Equal(0, g.MessageCount);
         Assert.Equal(0, g.TurnCount);
+    }
+
+    [Fact]
+    public async Task A_hung_request_times_out_with_a_clear_message()
+    {
+        // A listener that accepts the connection but never answers.
+        var l = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 0);
+        l.Start();
+        var port = ((System.Net.IPEndPoint)l.LocalEndpoint).Port;
+        var old = GeminiAssistant.RequestTimeout;
+        GeminiAssistant.RequestTimeout = TimeSpan.FromSeconds(2);
+        try
+        {
+            var g = new GeminiAssistant(Key, baseUrl: $"http://127.0.0.1:{port}");
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            var ex = await Assert.ThrowsAsync<GeminiException>(() => g.SendAsync("hi", true));
+            Assert.True(sw.Elapsed < TimeSpan.FromSeconds(10));
+            Assert.Contains("didn't answer", GeminiAssistant.Describe(ex));
+        }
+        finally { GeminiAssistant.RequestTimeout = old; l.Stop(); }
     }
 
     [Fact]

@@ -496,7 +496,7 @@ public sealed class AssistantPage : PageBase
         var ct = _cts.Token;
         try
         {
-            var progress = new Progress<string>(s => _status.Text = s);
+            var progress = new Progress<string>(SetStatus);
             bool share = Settings.Current.AssistantSharePcDetails;
             var reply = claude ? await Task.Run(() => _claude!.SendAsync(text, share, progress, ct))
                 : gemini ? await Task.Run(() => _gemini!.SendAsync(text, share, progress, ct))
@@ -517,14 +517,28 @@ public sealed class AssistantPage : PageBase
         }
     }
 
+    private System.Windows.Threading.DispatcherTimer? _clock;
+    private DateTime _busySince;
+    private string _statusText = "";
+
     private void SetBusy(bool busy, string status)
     {
         _busy = busy;
         _send.Content = busy ? "Stop" : "Send";
         _input.IsEnabled = !busy;
+        _statusText = status;
         _status.Text = status;
         _status.Visibility = busy ? Visibility.Visible : Visibility.Collapsed;
+        // A visible seconds counter so a slow answer never looks frozen.
+        _clock?.Stop();
+        if (!busy) return;
+        _busySince = DateTime.Now;
+        _clock = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
+        _clock.Tick += (_, _) => _status.Text = $"{_statusText}   {(int)(DateTime.Now - _busySince).TotalSeconds}s  ·  Stop cancels";
+        _clock.Start();
     }
+
+    private void SetStatus(string s) { _statusText = s; _status.Text = $"{s}   {(int)(DateTime.Now - _busySince).TotalSeconds}s  ·  Stop cancels"; }
 
     private void AddUser(string text)
     {
