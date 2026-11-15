@@ -30,6 +30,7 @@ public partial class MainWindow : Window
         _nav =
         [
             new("overview", "Overview", "IcoOverview", () => new OverviewPage(), "dashboard cpu gpu ram temperature uptime health"),
+            new("assistant", "Assistant", "IcoSparkle", () => new AssistantPage(), "ai assistant claude chat ask question advice anthropic"),
             new("optimization", "Optimization", "IcoOptimize", () => new OptimizationPage(), "profiles recommendations balanced gaming competitive creator custom background apps"),
             new("gaming", "Gaming", "IcoGaming", () => new GamingPage(), "game mode hags gpu scheduling power plan launch fullscreen"),
             new("network", "Network", "IcoNetwork", () => new NetworkPage(), "dns ping latency packet loss adapter wifi ethernet winsock"),

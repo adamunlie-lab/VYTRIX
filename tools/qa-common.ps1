@@ -8,7 +8,7 @@ function New-QaDataDir([switch]$TermsAccepted) {
     New-Item -ItemType Directory -Force $dir | Out-Null
     if ($TermsAccepted) {
         # Update checks off: QA must not contact GitHub or show update prompts (the update test enables them itself).
-        '{ "acceptedTermsVersion": "1.1", "acceptedTermsAt": "2026-01-01T00:00:00", "checkUpdatesOnStart": false, "gitHubFeedIntroduced": true }' | Set-Content (Join-Path $dir 'settings.json') -Encoding ascii
+        '{ "acceptedTermsVersion": "1.2", "acceptedTermsAt": "2026-01-01T00:00:00", "checkUpdatesOnStart": false, "gitHubFeedIntroduced": true }' | Set-Content (Join-Path $dir 'settings.json') -Encoding ascii
     }
     $env:VYTRIX_DATA_DIR = $dir
     return $dir

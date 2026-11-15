@@ -88,6 +88,16 @@ public static class HelpContent
                 ("Not supported", "Your PC or Windows version can't use it. The tooltip says why.")),
             new HelpPara("Higher-risk tweaks ask you to confirm first. Turning off an **Already on** tweak really turns it off; if it's controlled somewhere VYTRIX deliberately doesn't change, such as a policy, VYTRIX tells you where.")),
 
+        new("assistant", "The AI Assistant", "IcoSparkle",
+            "Ask Claude about your PC in plain language; it suggests, you decide.",
+            "assistant", "Open Assistant", "ai assistant claude chat anthropic api key share privacy cost",
+            new HelpSteps(
+                "Create an API key in the Anthropic Console. Usage is billed to your Anthropic account, usually a few cents per conversation.",
+                "Open **Assistant** in the sidebar and paste the key. It's stored on this PC, encrypted for your Windows account.",
+                "Ask anything, like \"Why does my PC feel slow?\" or \"What should I change for gaming?\""),
+            new HelpPara("The Assistant can look at your PC and suggest changes as buttons, but it **can't change anything by itself**. Tweaks still ask you to confirm, and everything stays undoable."),
+            new HelpPara("With **Share PC details** on, it can read your hardware, live readings, tweak states, top apps and VYTRIX's change history. Turn it off at the top of the Assistant page for general answers only. Use **Key** there to remove your key.")),
+
         new("restore", "Undo anything", "IcoRestore",
             "Everything VYTRIX changes is recorded first, so you can always go back.",
             "restore", "Open Restore Center", "undo rollback roll back restore point backup journal log uninstall",
@@ -124,7 +134,7 @@ public static class HelpContent
                 ("Something feels wrong", "Roll the change back in the Restore Center, or use **Roll back everything**."),
                 ("Windows warned me about the installer", "VYTRIX isn't code-signed yet. Choose **More info**, then **Run anyway**."),
                 ("DNS changed but IPv6 didn't", "DNS presets apply to IPv4 only. IPv6 DNS is left unchanged."),
-                ("Does VYTRIX collect my data?", "No. VYTRIX sends no information about you or your PC. It contacts GitHub to check for updates, and the Network tests ping public servers."),
+                ("Does VYTRIX collect my data?", "No. VYTRIX has no analytics. It contacts GitHub to check for updates, and the Network tests ping public servers. If you set up the Assistant, your messages (and PC details, if you allow it) go to Anthropic."),
                 ("Where are my reports?", "In **Documents**, in the **VYTRIX Reports** folder."),
                 ("How do I uninstall?", "Optionally **Roll back everything** first, then uninstall VYTRIX from Windows Settings, Apps."))),
     ];

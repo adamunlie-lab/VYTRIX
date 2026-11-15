@@ -1,5 +1,5 @@
 VYTRIX TERMS OF AGREEMENT
-Version 1.1 - Effective November 14, 2026
+Version 1.2 - Effective November 15, 2026
 
 Please read these Terms carefully. By installing, copying or using VYTRIX
 ("the Software") you agree to these Terms. If you do not agree, do not
@@ -87,8 +87,9 @@ create a warranty (see section 8).
 
 6. PRIVACY
 
-  (a) VYTRIX does not collect, sell or transmit personal data. It has no
-      analytics, telemetry or advertising.
+  (a) VYTRIX does not collect or sell personal data. It has no
+      analytics, telemetry or advertising, and nothing about you is sent
+      anywhere except as described in this section.
   (b) All data VYTRIX creates (settings, change journal, registry
       backups, logs and reports) is stored locally on your computer in
       %LocalAppData%\VYTRIX and Documents\VYTRIX Reports. You can delete
@@ -98,13 +99,26 @@ create a warranty (see section 8).
       public DNS providers (Cloudflare, Google) and to www.microsoft.com
       to test name resolution, and DNS lookups go to
       the servers you choose.
-  (e) Update checks: unless you turn them off in Settings > Updates,
+  (d) Update checks: unless you turn them off in Settings > Updates,
       VYTRIX checks GitHub (github.com) for a newer release when it
       starts and every 6 hours while it is open, and may download a new
       installer in the background. These are ordinary web requests: like
       any website, GitHub receives your IP address and the VYTRIX version
       number. No other information is sent.
-  (d) System reports you export may contain hardware details, installed
+  (e) AI assistant: the Assistant is off until you enter your own
+      Anthropic API key. When you use it, your messages are sent to
+      Anthropic, PBC to generate answers, under your own agreement with
+      Anthropic, and usage is billed to your Anthropic account. If
+      "Share PC details" is on (you can turn it off at any time), the
+      Assistant may also send your hardware models, live readings, disk
+      space, Windows version, tweak states, the names and memory use of
+      your top running apps, and VYTRIX's change history. It never sends
+      your files, your computer name, your Windows user name or your API
+      key to anyone but Anthropic. Your key is stored on this computer,
+      encrypted for your Windows account, and you can remove it at any
+      time. AI answers can be wrong: the Assistant can only suggest
+      changes, and each one still needs your click and confirmation.
+  (f) System reports you export may contain hardware details, installed
       application names and your computer name. Review a report before
       sharing it with anyone.
 
@@ -114,9 +128,11 @@ create a warranty (see section 8).
 VYTRIX uses components of Windows (such as powercfg, netsh, ipconfig,
 winsat and System Restore) and, where present, the NVIDIA Management
 Library (NVML) installed with NVIDIA graphics drivers. These components
-are provided by their respective owners under their own terms. VYTRIX is
+are provided by their respective owners under their own terms. The
+optional AI assistant uses Claude, provided by Anthropic, PBC under
+Anthropic's own terms and usage policies. VYTRIX is
 not affiliated with, endorsed by or sponsored by Microsoft, NVIDIA, AMD,
-Intel or any other hardware or software vendor. All trademarks belong to
+Intel, Anthropic or any other hardware or software vendor. All trademarks belong to
 their respective owners.
 
 

@@ -1,5 +1,5 @@
 # Visual QA: opens every page in turn and saves a screenshot of each.
-param([string]$OutDir = "$env:TEMP\vytrix-qa", [string[]]$Pages = @('overview','optimization','gaming','network','memory','storage','tweaks','startup','restore','hardware','apps','services','benchmark','settings','help'), [int]$Wait = 6)
+param([string]$OutDir = "$env:TEMP\vytrix-qa", [string[]]$Pages = @('overview','assistant','optimization','gaming','network','memory','storage','tweaks','startup','restore','hardware','apps','services','benchmark','settings','help'), [int]$Wait = 6)
 $root = Split-Path $PSScriptRoot -Parent
 $exe = Get-ChildItem (Join-Path $root 'src\Vytrix\bin') -Recurse -Filter VYTRIX.exe | Sort-Object LastWriteTime -Descending | Select-Object -First 1
 New-Item -ItemType Directory -Force $OutDir | Out-Null

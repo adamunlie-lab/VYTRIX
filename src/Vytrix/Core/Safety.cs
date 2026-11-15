@@ -301,13 +301,15 @@ public sealed class AppSettings
     public DateTime? AcceptedTermsAt { get; set; }
     public List<string> CustomProfileTweaks { get; set; } = [];
     public string CustomProfilePowerPlan { get; set; } = "keep";   // keep | balanced | performance
+    /// <summary>Let the assistant read this PC's readings, tweak states, top apps and change history.</summary>
+    public bool AssistantSharePcDetails { get; set; } = true;
 }
 
 /// <summary>The VYTRIX Terms of Agreement (legal\TERMS.txt, embedded at build time).</summary>
 public static class Terms
 {
     /// <summary>Bump when the terms text changes materially; users are asked to accept again.</summary>
-    public const string Version = "1.1";   // 1.1: automatic update checks via GitHub
+    public const string Version = "1.2";   // 1.1: automatic update checks via GitHub; 1.2: optional AI assistant
 
     public static string Text { get; } = Load();
 
