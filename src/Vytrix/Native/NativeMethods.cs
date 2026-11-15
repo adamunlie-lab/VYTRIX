@@ -142,6 +142,8 @@ public static class Win32
     public const uint SPI_SETMOUSE = 0x0004;
     public const uint SPI_SETMENUSHOWDELAY = 0x006B;
     public const uint SPI_SETANIMATION = 0x0049;
+    public const uint SPI_SETKEYBOARDDELAY = 0x0017;
+    public const uint SPI_SETDRAGFULLWINDOWS = 0x0025;
     public const uint SPIF_UPDATEINIFILE = 0x01;
     public const uint SPIF_SENDCHANGE = 0x02;
     public const int HWND_BROADCAST = 0xffff;

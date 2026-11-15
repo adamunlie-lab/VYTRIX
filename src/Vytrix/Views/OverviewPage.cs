@@ -377,12 +377,23 @@ public sealed class OverviewPage : PageBase
         if (_slowTick++ % 10 == 0) _ = RefreshSlowAsync();
     }
 
+    // Tweak states rarely change on their own: re-read them once a minute, or right after a tweak changes.
+    private List<(Tweak t, TweakState s)>? _tweakStates;
+    private DateTime _tweakStatesAt;
+    private bool _tweakHooked;
+
     private async Task RefreshSlowAsync()
     {
+        if (!_tweakHooked) { TweakEngine.TweakChanged += _ => _tweakStates = null; _tweakHooked = true; }
         var plan = await Task.Run(() => PowerService.Active);
         var startup = await Task.Run(StartupService.EnabledCount);
         var vols = await Task.Run(SystemInfo.Volumes);
-        var states = await Task.Run(() => TweakCatalog.All.Select(t => (t, s: t.GetState())).ToList());
+        if (_tweakStates is null || DateTime.Now - _tweakStatesAt > TimeSpan.FromMinutes(1))
+        {
+            _tweakStates = await Task.Run(() => TweakCatalog.All.Select(t => (t, s: t.GetState())).ToList());
+            _tweakStatesAt = DateTime.Now;
+        }
+        var states = _tweakStates;
         _info["Power plan"].Text = plan?.Name ?? "Unavailable";
         _info["Startup apps"].Text = startup < 0 ? "Unavailable" : $"{startup} enabled";
         var sys = vols.FirstOrDefault(v => v.Name.StartsWith(System.IO.Path.GetPathRoot(Environment.SystemDirectory)![..1], StringComparison.OrdinalIgnoreCase));

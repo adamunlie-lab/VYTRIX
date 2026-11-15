@@ -97,9 +97,13 @@ foreach ($n in 'Overview','Assistant','Optimization','Gaming','Network','Memory'
 
 # 3a. Assistant without a key shows setup (no network, nothing is sent)
 (FindByName (Win) 'Assistant').GetCurrentPattern([Windows.Automation.SelectionItemPattern]::Pattern).Select(); Start-Sleep -Seconds 1
-Start-Sleep -Seconds 2   # it checks whether the local AI is set up
-$setup = $null -ne (FindByName (Win) 'Free AI on your PC') -and $null -ne (FindByName (Win) 'Optional: Claude')
-$chat = $null -ne (FindByName (Win) 'How can I help your PC today?')
+# It checks whether the local AI is set up, and may need to start Ollama first (up to ~15 s).
+$setup = $false; $chat = $false
+for ($i = 0; $i -lt 40 -and -not ($setup -or $chat); $i++) {
+    Start-Sleep -Milliseconds 500
+    $setup = $null -ne (FindByName (Win) 'Free AI on your PC') -and $null -ne (FindByName (Win) 'Optional: Claude')
+    $chat = $null -ne (FindByName (Win) 'How can I help your PC today?')
+}
 Check ("Assistant: " + $(if ($chat) { 'free local chat ready (Ollama + model present)' } else { 'free setup shown first' })) ($setup -or $chat)
 Shot 'assistant-setup'
 

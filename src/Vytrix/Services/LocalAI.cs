@@ -66,6 +66,9 @@ public static class Ollama
         if (await VersionAsync(ct) is not null) return true;
         var exe = ExePath;
         if (exe is null) return false;
+        // QA copies of VYTRIX never launch the user's Ollama (a copy started from a restricted test shell
+        // would leave behind an Ollama that can't serve).
+        if (Environment.GetEnvironmentVariable("VYTRIX_QA_NO_OLLAMA_START") == "1") return false;
         // Prefer Ollama's own tray app (it runs the server the way Ollama expects); fall back to the bare server.
         var tray = Path.Combine(Path.GetDirectoryName(exe)!, "ollama app.exe");
         try
@@ -74,11 +77,13 @@ public static class Ollama
             else Process.Start(new ProcessStartInfo(exe, "serve") { CreateNoWindow = true, UseShellExecute = false, WindowStyle = ProcessWindowStyle.Hidden });
         }
         catch (Exception ex) { Log.Warn("ollama", $"Could not start Ollama: {ex.Message}"); return false; }
-        for (int i = 0; i < 30; i++)
+        // Wait up to about 10 seconds; after that the setup page explains and offers "Check again".
+        for (int i = 0; i < 20; i++)
         {
             await Task.Delay(500, ct);
             if (await VersionAsync(ct) is not null) { Log.Info("ollama", "Started Ollama."); return true; }
         }
+        Log.Warn("ollama", "Ollama is installed but its server didn't start within 10 s.");
         return false;
     }
 

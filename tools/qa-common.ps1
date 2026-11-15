@@ -11,5 +11,8 @@ function New-QaDataDir([switch]$TermsAccepted) {
         '{ "acceptedTermsVersion": "1.3", "acceptedTermsAt": "2026-01-01T00:00:00", "checkUpdatesOnStart": false, "gitHubFeedIntroduced": true }' | Set-Content (Join-Path $dir 'settings.json') -Encoding ascii
     }
     $env:VYTRIX_DATA_DIR = $dir
+    # QA copies must never launch the user's Ollama: one started from a restricted test shell
+    # can't serve, and it would block the user's own VYTRIX from starting Ollama properly.
+    $env:VYTRIX_QA_NO_OLLAMA_START = '1'
     return $dir
 }

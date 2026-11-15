@@ -375,6 +375,16 @@ public static class TweakCatalog
         ["win.classicmenu"] = TweakComponent.System, ["startup.delay"] = TweakComponent.System, ["startup.faststartup"] = TweakComponent.System,
         ["privacy.adid"] = TweakComponent.Privacy, ["privacy.tailored"] = TweakComponent.Privacy, ["privacy.activity"] = TweakComponent.Privacy,
         ["privacy.diagdata"] = TweakComponent.Privacy, ["privacy.speech"] = TweakComponent.Privacy,
+        // Added in 1.4
+        ["gpu.pcieaspm"] = TweakComponent.Gpu,
+        ["storage.diskidle"] = TweakComponent.Storage, ["storage.longpaths"] = TweakComponent.Storage, ["vfx.iconsonly"] = TweakComponent.Storage,
+        ["input.stickykeys"] = TweakComponent.Input, ["input.filterkeys"] = TweakComponent.Input, ["input.togglekeys"] = TweakComponent.Input,
+        ["input.keydelay"] = TweakComponent.Input, ["input.usbsuspend"] = TweakComponent.Input, ["input.gamebarbutton"] = TweakComponent.Input,
+        ["vfx.dragfull"] = TweakComponent.Display, ["vfx.iconshadow"] = TweakComponent.Display, ["vfx.selectionalpha"] = TweakComponent.Display, ["vfx.peek"] = TweakComponent.Display,
+        ["win.hiddenfiles"] = TweakComponent.System, ["win.thispc"] = TweakComponent.System, ["win.lockscreentips"] = TweakComponent.System, ["win.startrecs"] = TweakComponent.System,
+        ["win.endtask"] = TweakComponent.System, ["win.taskview"] = TweakComponent.System, ["win.autoplay"] = TweakComponent.System, ["startup.restartapps"] = TweakComponent.System,
+        ["privacy.settingsads"] = TweakComponent.Privacy, ["privacy.langlist"] = TweakComponent.Privacy, ["privacy.apptracking"] = TweakComponent.Privacy,
+        ["privacy.inking"] = TweakComponent.Privacy, ["privacy.feedback"] = TweakComponent.Privacy, ["privacy.cloudsearch"] = TweakComponent.Privacy, ["privacy.searchhistory"] = TweakComponent.Privacy,
     };
 
     public static TweakComponent ComponentOf(string id) => ComponentMap.TryGetValue(id, out var c) ? c : TweakComponent.System;
@@ -412,6 +422,41 @@ public static class TweakCatalog
                 Extra = { ["previous"] = before.ToString(), ["plan"] = plan?.Guid ?? "" },
             });
         return (true, $"Minimum processor state (plugged in) set to {target}% on {plan?.Name ?? "the active plan"}.");
+    });
+
+    // More documented power setting GUIDs (powercfg /query).
+    private const string SubUsb = "2a737441-1930-4402-8d77-b2bebba308a3", UsbSelectiveSuspend = "48e6b7a6-50f5-4782-a5d4-53bb8f07e226";
+    private const string SubPciExpress = "501a4d13-42af-4429-9fd1-a8218c268e20", PcieAspm = "ee12f906-d277-404b-b6da-e5fa1a576df5";
+    private const string SubDisk = "0012ee47-9041-4b5d-9b77-535fba8b1442", DiskIdle = "6738e2c4-e8a5-4a42-b16a-e040e769756e";
+
+    private static uint? ReadAc(string sub, string setting) => VxNative.vx_power_read_ac(sub, setting, out var v) == 1 ? v : null;
+
+    /// <summary>
+    /// Sets a plugged-in value on the active power plan, journaling the previous value so turning the tweak
+    /// off restores exactly what was there (for the same plan); otherwise the given fallback.
+    /// </summary>
+    private static Task<(bool, string)> SetAcPower(string id, string sub, string setting, uint value, bool on, uint fallback, string label) => Task.Run<(bool, string)>(() =>
+    {
+        var plan = PowerService.Active;
+        if (ReadAc(sub, setting) is not { } before) return (false, "Windows did not return the current power setting.");
+        uint target = value;
+        if (!on)
+        {
+            var rec = Journal.All.FirstOrDefault(r => r.Target == id + ":raw" && !r.RolledBack && r.Extra.GetValueOrDefault("plan") == plan?.Guid);
+            target = rec is not null && uint.TryParse(rec.Extra.GetValueOrDefault("previous"), out var p) ? p : fallback;
+            if (rec is not null) Journal.MarkRolledBack(rec);
+        }
+        if (VxNative.vx_power_write_ac(sub, setting, target) != 1)
+            return (false, "Windows refused to change the power plan setting. Relaunch VYTRIX as administrator and try again.");
+        if (on)
+            Journal.Add(new ChangeRecord
+            {
+                Kind = ChangeKind.Tweak, Target = id + ":raw", Reversible = false,
+                Title = $"{label}: {before} → {target} ({plan?.Name})",
+                Detail = "Previous value recorded; turning the tweak off restores it.",
+                Extra = { ["previous"] = before.ToString(), ["plan"] = plan?.Guid ?? "" },
+            });
+        return (true, $"{label} set on {plan?.Name ?? "the active plan"}.");
     });
 
     private static void SpiMouse(bool precisionOff)
@@ -766,6 +811,290 @@ public static class TweakCatalog
             Explanation = "Same as Performance Options → \"Animations in the taskbar\".",
             AppliesAfter = "Explorer restart",
             Ops = [RegOp.DWord(Hive.HKCU, ExplorerAdv, "TaskbarAnimations", 0, 1)],
+        },
+        new()
+        {
+            Id = "vfx.dragfull", Name = "Don't show window contents while dragging", Category = TweakCategory.VisualEffects,
+            Description = "Moving a window drags an outline instead of redrawing the whole window.",
+            ExpectedEffect = "Less redrawing while dragging windows. Mostly helps older or integrated GPUs; cosmetic on gaming PCs.",
+            Explanation = "Same as Performance Options → \"Show window contents while dragging\". Applied live through SystemParametersInfo.",
+            Ops = [RegOp.Str(Hive.HKCU, @"Control Panel\Desktop", "DragFullWindows", "0", "1")],
+            AfterChange = on => Win32.SystemParametersInfo(Win32.SPI_SETDRAGFULLWINDOWS, on ? 0u : 1u, IntPtr.Zero, Win32.SPIF_UPDATEINIFILE | Win32.SPIF_SENDCHANGE),
+        },
+        new()
+        {
+            Id = "vfx.iconshadow", Name = "Turn off desktop icon label shadows", Category = TweakCategory.VisualEffects,
+            Description = "Removes the drop shadow behind desktop icon names.",
+            ExpectedEffect = "Crisper icon labels and a tiny bit less drawing. Cosmetic.",
+            Explanation = "Same as Performance Options → \"Use drop shadows for icon labels on the desktop\".",
+            AppliesAfter = "Explorer restart",
+            Ops = [RegOp.DWord(Hive.HKCU, ExplorerAdv, "ListviewShadow", 0, 1)],
+        },
+        new()
+        {
+            Id = "vfx.selectionalpha", Name = "Turn off translucent selection rectangle", Category = TweakCategory.VisualEffects,
+            Description = "Drag-selecting files shows a plain outline instead of a see-through box.",
+            ExpectedEffect = "Slightly lighter drawing when selecting many files. Cosmetic.",
+            Explanation = "Same as Performance Options → \"Show translucent selection rectangle\".",
+            AppliesAfter = "Explorer restart",
+            Ops = [RegOp.DWord(Hive.HKCU, ExplorerAdv, "ListviewAlphaSelect", 0, 1)],
+        },
+        new()
+        {
+            Id = "vfx.peek", Name = "Turn off Peek", Category = TweakCategory.VisualEffects,
+            Description = "Hovering the far corner of the taskbar no longer fades all windows to show the desktop.",
+            ExpectedEffect = "No accidental desktop previews when your mouse touches the corner mid-game. Clicking the corner still shows the desktop.",
+            Explanation = "Same as Performance Options → \"Enable Peek\" (Desktop Window Manager's EnableAeroPeek).",
+            AppliesAfter = "Sign out",
+            Ops = [RegOp.DWord(Hive.HKCU, @"Software\Microsoft\Windows\DWM", "EnableAeroPeek", 0, 1)],
+        },
+        new()
+        {
+            Id = "vfx.iconsonly", Name = "Show icons instead of thumbnails", Category = TweakCategory.VisualEffects,
+            Description = "File Explorer shows file-type icons instead of generating picture and video previews.",
+            ExpectedEffect = "Folders full of photos or videos open faster, especially on hard drives and network shares. You lose the previews.",
+            Explanation = "Same as File Explorer → Options → View → \"Always show icons, never thumbnails\".",
+            Ops = [RegOp.DWord(Hive.HKCU, ExplorerAdv, "IconsOnly", 1, 0)],
+            AfterChange = _ => Win32.BroadcastSettingChange("ShellState"),
+        },
+
+        // ───────────────────────────── Input
+        new()
+        {
+            Id = "input.stickykeys", Name = "Turn off the Sticky Keys shortcut", Category = TweakCategory.Gaming,
+            Description = "Pressing Shift five times no longer pops up the Sticky Keys prompt.",
+            ExpectedEffect = "No more pop-up stealing focus from your game when you tap Shift repeatedly. Sticky Keys itself still works if you turn it on in Settings.",
+            Explanation = "Same as Settings → Accessibility → Keyboard → Sticky keys → \"Keyboard shortcut for Sticky keys\". Clears the shortcut flag only (Flags 510 → 506).",
+            AppliesAfter = "Sign out",
+            Ops = [RegOp.Str(Hive.HKCU, @"Control Panel\Accessibility\StickyKeys", "Flags", "506", "510")],
+        },
+        new()
+        {
+            Id = "input.filterkeys", Name = "Turn off the Filter Keys shortcut", Category = TweakCategory.Gaming,
+            Description = "Holding right Shift for eight seconds no longer pops up the Filter Keys prompt.",
+            ExpectedEffect = "No pop-up when you hold Shift to sprint or crouch. Filter Keys itself still works if you turn it on in Settings.",
+            Explanation = "Same as Settings → Accessibility → Keyboard → Filter keys → \"Keyboard shortcut for Filter keys\". Clears the shortcut flag only (Flags 126 → 122).",
+            AppliesAfter = "Sign out",
+            Ops = [RegOp.Str(Hive.HKCU, @"Control Panel\Accessibility\Keyboard Response", "Flags", "122", "126")],
+        },
+        new()
+        {
+            Id = "input.togglekeys", Name = "Turn off the Toggle Keys shortcut", Category = TweakCategory.Gaming,
+            Description = "Holding Num Lock for five seconds no longer turns on Toggle Keys.",
+            ExpectedEffect = "No surprise prompt or beeps from holding Num Lock. Toggle Keys itself still works if you turn it on in Settings.",
+            Explanation = "Same as Settings → Accessibility → Keyboard → Toggle keys → \"Keyboard shortcut for Toggle keys\". Clears the shortcut flag only (Flags 62 → 58).",
+            AppliesAfter = "Sign out",
+            Ops = [RegOp.Str(Hive.HKCU, @"Control Panel\Accessibility\ToggleKeys", "Flags", "58", "62")],
+        },
+        new()
+        {
+            Id = "input.keydelay", Name = "Shorter key repeat delay", Category = TweakCategory.Windows,
+            Description = "A held key starts repeating sooner (about 250 ms instead of 500 ms).",
+            ExpectedEffect = "Faster held-key repeat in text and menus. Games that read keys directly are unaffected.",
+            Explanation = "Same as Control Panel → Keyboard → Repeat delay, moved to the shortest setting. Applied live through SystemParametersInfo.",
+            Ops = [RegOp.Str(Hive.HKCU, @"Control Panel\Keyboard", "KeyboardDelay", "0", "1")],
+            AfterChange = on => Win32.SystemParametersInfo(Win32.SPI_SETKEYBOARDDELAY, on ? 0u : 1u, IntPtr.Zero, Win32.SPIF_UPDATEINIFILE | Win32.SPIF_SENDCHANGE),
+        },
+        new()
+        {
+            Id = "input.usbsuspend", Name = "Keep USB devices awake when plugged in", Category = TweakCategory.Power,
+            Description = "Turns off USB selective suspend in the active power plan while on AC power.",
+            ExpectedEffect = "Can fix mice, headsets, controllers and USB audio cutting out or lagging after a moment idle. Slightly higher idle power use.",
+            Explanation = "Changes \"USB settings → USB selective suspend setting (Plugged in)\" in Control Panel → Power Options → Advanced settings, for the active plan only. Battery behaviour is unchanged. Turning this off restores the exact previous value.",
+            Compatibility = "All Windows 10/11 PCs with USB devices. Applies to the active power plan.",
+            ChangesText = "Active power plan → USB settings → USB selective suspend (plugged in) = Disabled",
+            CustomState = () => ReadAc(SubUsb, UsbSelectiveSuspend) is { } v ? v == 0 : null,
+            CustomApply = () => SetAcPower("input.usbsuspend", SubUsb, UsbSelectiveSuspend, 0, true, 1, "USB selective suspend (plugged in) disabled"),
+            CustomRevert = () => SetAcPower("input.usbsuspend", SubUsb, UsbSelectiveSuspend, 0, false, 1, "USB selective suspend (plugged in) restored"),
+        },
+        new()
+        {
+            Id = "input.gamebarbutton", Name = "Controller Xbox button doesn't open Game Bar", Category = TweakCategory.Gaming,
+            Description = "Pressing the Xbox button on a controller no longer opens Xbox Game Bar.",
+            ExpectedEffect = "No overlay popping up when you press the guide button in games or Steam Big Picture. Win+G still opens Game Bar.",
+            Explanation = "Same as Settings → Gaming → Xbox Game Bar → \"Open Xbox Game Bar using this button on a controller\".",
+            Ops = [RegOp.DWord(Hive.HKCU, @"Software\Microsoft\GameBar", "UseNexusForGameBarEnabled", 0, 1)],
+        },
+
+        // ───────────────────────────── GPU, storage & power links
+        new()
+        {
+            Id = "gpu.pcieaspm", Name = "Turn off PCI Express link power saving when plugged in", Category = TweakCategory.Power,
+            Description = "Keeps PCIe links (graphics card, NVMe drives) at full power on AC instead of dropping into low-power states.",
+            ExpectedEffect = "Can remove small wake-up delays and rare stutters on some systems. Raises idle power use a little; most modern PCs won't notice a difference.",
+            Explanation = "Changes \"PCI Express → Link State Power Management (Plugged in)\" to Off in Control Panel → Power Options → Advanced settings, for the active plan only. Battery behaviour is unchanged. Turning this off restores the exact previous value.",
+            Risk = Risk.Moderate, Compatibility = "Windows 10/11 PCs with PCIe devices. Applies to the active power plan.",
+            ChangesText = "Active power plan → PCI Express → Link State Power Management (plugged in) = Off",
+            CustomState = () => ReadAc(SubPciExpress, PcieAspm) is { } v ? v == 0 : null,
+            CustomApply = () => SetAcPower("gpu.pcieaspm", SubPciExpress, PcieAspm, 0, true, 1, "PCIe link power management (plugged in) off"),
+            CustomRevert = () => SetAcPower("gpu.pcieaspm", SubPciExpress, PcieAspm, 0, false, 1, "PCIe link power management (plugged in) restored"),
+        },
+        new()
+        {
+            Id = "storage.diskidle", Name = "Never turn off hard disks when plugged in", Category = TweakCategory.Power,
+            Description = "Stops Windows from spinning down hard drives after 20 minutes idle while on AC power.",
+            ExpectedEffect = "No several-second pause while a sleeping hard drive spins back up. No effect on SSDs.",
+            Explanation = "Changes \"Hard disk → Turn off hard disk after (Plugged in)\" to Never in Control Panel → Power Options → Advanced settings, for the active plan only. Battery behaviour is unchanged. Turning this off restores the exact previous value.",
+            Compatibility = "Useful on PCs with spinning hard drives. Applies to the active power plan.",
+            ChangesText = "Active power plan → Hard disk → Turn off hard disk after (plugged in) = Never",
+            CustomState = () => ReadAc(SubDisk, DiskIdle) is { } v ? v == 0 : null,
+            CustomApply = () => SetAcPower("storage.diskidle", SubDisk, DiskIdle, 0, true, 1200, "Hard disk turn-off (plugged in) set to never"),
+            CustomRevert = () => SetAcPower("storage.diskidle", SubDisk, DiskIdle, 0, false, 1200, "Hard disk turn-off (plugged in) restored"),
+        },
+        new()
+        {
+            Id = "storage.longpaths", Name = "Allow long file paths", Category = TweakCategory.Windows,
+            Description = "Lets programs that support it use file paths longer than 260 characters.",
+            ExpectedEffect = "Fixes \"path too long\" errors with deep game mod folders, Node.js, Git and similar tools.",
+            Explanation = "Sets the documented LongPathsEnabled value (the same as the Group Policy \"Enable Win32 long paths\"). Programs still have to opt in; nothing changes for those that don't.",
+            RequiresAdmin = true, MinBuild = 14393, Compatibility = "Windows 10 1607+ / Windows 11.",
+            Ops = [RegOp.DWord(Hive.HKLM, @"SYSTEM\CurrentControlSet\Control\FileSystem", "LongPathsEnabled", 1, 0)],
+        },
+
+        // ───────────────────────────── Windows & Explorer
+        new()
+        {
+            Id = "win.hiddenfiles", Name = "Show hidden files and folders", Category = TweakCategory.Windows,
+            Description = "File Explorer shows files and folders marked as hidden (such as AppData).",
+            ExpectedEffect = "Easier to find game saves, configs and mod folders. Protected operating system files stay hidden.",
+            Explanation = "Same as File Explorer → View → Show → Hidden items.",
+            Ops = [RegOp.DWord(Hive.HKCU, ExplorerAdv, "Hidden", 1, 2)],
+            AfterChange = _ => Win32.BroadcastSettingChange("ShellState"),
+        },
+        new()
+        {
+            Id = "win.thispc", Name = "Open File Explorer to This PC", Category = TweakCategory.Windows,
+            Description = "File Explorer opens on your drives instead of Home / Quick access.",
+            ExpectedEffect = "Drives are one click away, and Explorer doesn't have to load recent files and cloud items on open.",
+            Explanation = "Same as File Explorer → Options → General → \"Open File Explorer to: This PC\".",
+            Ops = [RegOp.DWord(Hive.HKCU, ExplorerAdv, "LaunchTo", 1, 2)],
+        },
+        new()
+        {
+            Id = "win.lockscreentips", Name = "Turn off lock screen tips and fun facts", Category = TweakCategory.Windows,
+            Description = "No tips, ads or \"fun facts\" over your lock screen picture.",
+            ExpectedEffect = "A clean lock screen. Your chosen picture or slideshow stays.",
+            Explanation = "Same as Settings → Personalization → Lock screen → \"Get fun facts, tips, tricks, and more on your lock screen\".",
+            Ops =
+            [
+                RegOp.DWord(Hive.HKCU, Cdm, "RotatingLockScreenOverlayEnabled", 0, 1),
+                RegOp.DWord(Hive.HKCU, Cdm, "SubscribedContent-338387Enabled", 0, 1),
+            ],
+        },
+        new()
+        {
+            Id = "win.startrecs", Name = "Turn off Start menu recommendations", Category = TweakCategory.Windows,
+            Description = "Start stops recommending tips, shortcuts and new apps.",
+            ExpectedEffect = "A less cluttered Start menu with fewer promotions. Your recent files setting is separate.",
+            Explanation = "Same as Settings → Personalization → Start → \"Show recommendations for tips, shortcuts, new apps, and more\".",
+            MinBuild = 22621, Compatibility = "Windows 11 22H2 and newer.",
+            Ops = [RegOp.DWord(Hive.HKCU, ExplorerAdv, "Start_IrisRecommendations", 0, 1)],
+        },
+        new()
+        {
+            Id = "win.endtask", Name = "Add \"End task\" to taskbar right-click", Category = TweakCategory.Windows,
+            Description = "Right-clicking an app on the taskbar offers End task.",
+            ExpectedEffect = "Close a frozen game or app in two clicks, without opening Task Manager.",
+            Explanation = "Same as Settings → System → For developers → End Task.",
+            MinBuild = 22631, Compatibility = "Windows 11 23H2 and newer.",
+            Ops = [RegOp.DWord(Hive.HKCU, ExplorerAdv + @"\TaskbarDeveloperSettings", "TaskbarEndTask", 1, 0)],
+        },
+        new()
+        {
+            Id = "win.taskview", Name = "Hide the Task View button", Category = TweakCategory.Windows,
+            Description = "Removes the Task View button from the taskbar.",
+            ExpectedEffect = "A tidier taskbar. Win+Tab still opens Task View.",
+            Explanation = "Same as Settings → Personalization → Taskbar → Task view.",
+            Ops = [RegOp.DWord(Hive.HKCU, ExplorerAdv, "ShowTaskViewButton", 0, 1)],
+        },
+        new()
+        {
+            Id = "win.autoplay", Name = "Turn off AutoPlay", Category = TweakCategory.Windows,
+            Description = "Plugging in a USB drive, phone or disc no longer pops up an AutoPlay prompt.",
+            ExpectedEffect = "No pop-ups interrupting you, and media can't start an action automatically. Open drives yourself from File Explorer.",
+            Explanation = "Same as Settings → Bluetooth & devices → AutoPlay → \"Use AutoPlay for all media and devices\".",
+            Ops = [RegOp.DWord(Hive.HKCU, Explorer + @"\AutoplayHandlers", "DisableAutoplay", 1, 0)],
+        },
+        new()
+        {
+            Id = "startup.restartapps", Name = "Don't reopen apps after restarting", Category = TweakCategory.Startup,
+            Description = "Windows won't automatically restart the apps you had open when you sign back in.",
+            ExpectedEffect = "A cleaner, quicker start after updates and restarts; open only what you need.",
+            Explanation = "Same as Settings → Accounts → Sign-in options → \"Automatically save my restartable apps and restart them when I sign back in\".",
+            Ops = [RegOp.DWord(Hive.HKCU, @"Software\Microsoft\Windows NT\CurrentVersion\Winlogon", "RestartApps", 0, 0) with { OffValue = 1 }],
+        },
+
+        // ───────────────────────────── More privacy
+        new()
+        {
+            Id = "privacy.settingsads", Name = "Turn off suggested content in Settings", Category = TweakCategory.Privacy,
+            Description = "The Settings app stops showing suggested content and offers.",
+            ExpectedEffect = "Fewer promotions inside Settings.",
+            Explanation = "Same as Settings → Privacy & security → General → \"Show me suggested content in the Settings app\".",
+            Ops =
+            [
+                RegOp.DWord(Hive.HKCU, Cdm, "SubscribedContent-338393Enabled", 0, 1),
+                RegOp.DWord(Hive.HKCU, Cdm, "SubscribedContent-353694Enabled", 0, 1),
+                RegOp.DWord(Hive.HKCU, Cdm, "SubscribedContent-353696Enabled", 0, 1),
+            ],
+        },
+        new()
+        {
+            Id = "privacy.langlist", Name = "Don't share your language list with websites", Category = TweakCategory.Privacy,
+            Description = "Websites can no longer read your Windows language list to show locally relevant content.",
+            ExpectedEffect = "One less detail websites can use to identify you. Sites use your browser's language setting instead.",
+            Explanation = "Same as Settings → Privacy & security → General → \"Let websites show me locally relevant content by accessing my language list\".",
+            Ops = [RegOp.DWord(Hive.HKCU, @"Control Panel\International\User Profile", "HttpAcceptLanguageOptOut", 1, 0)],
+        },
+        new()
+        {
+            Id = "privacy.apptracking", Name = "Don't track app launches", Category = TweakCategory.Privacy,
+            Description = "Windows stops recording which apps you open to personalise Start and search.",
+            ExpectedEffect = "Less local tracking. Start no longer shows a \"most used\" list.",
+            Explanation = "Same as Settings → Privacy & security → General → \"Let Windows improve Start and search results by tracking app launches\".",
+            Ops = [RegOp.DWord(Hive.HKCU, ExplorerAdv, "Start_TrackProgs", 0, 1)],
+        },
+        new()
+        {
+            Id = "privacy.inking", Name = "Turn off inking and typing personalization", Category = TweakCategory.Privacy,
+            Description = "Windows stops building a personal dictionary from your typing and handwriting.",
+            ExpectedEffect = "Your typed words and handwriting aren't collected for suggestions. Typing suggestions may be less personal.",
+            Explanation = "Same as Settings → Privacy & security → Inking & typing personalization → \"Custom inking and typing dictionary\".",
+            Ops =
+            [
+                RegOp.DWord(Hive.HKCU, @"Software\Microsoft\InputPersonalization", "RestrictImplicitInkCollection", 1, 0),
+                RegOp.DWord(Hive.HKCU, @"Software\Microsoft\InputPersonalization", "RestrictImplicitTextCollection", 1, 0),
+                RegOp.DWord(Hive.HKCU, @"Software\Microsoft\InputPersonalization\TrainedDataStore", "HarvestContacts", 0, 1),
+                RegOp.DWord(Hive.HKCU, @"Software\Microsoft\Personalization\Settings", "AcceptedPrivacyPolicy", 0, 1),
+            ],
+        },
+        new()
+        {
+            Id = "privacy.feedback", Name = "Never ask for feedback", Category = TweakCategory.Privacy,
+            Description = "Windows stops popping up requests to rate or give feedback.",
+            ExpectedEffect = "No feedback prompts. You can still send feedback yourself with the Feedback Hub.",
+            Explanation = "Same as Settings → Privacy & security → Diagnostics & feedback → Feedback frequency → Never.",
+            Ops = [RegOp.DWord(Hive.HKCU, @"Software\Microsoft\Siuf\Rules", "NumberOfSIUFInPeriod", 0, null)],
+        },
+        new()
+        {
+            Id = "privacy.cloudsearch", Name = "Don't include cloud content in search", Category = TweakCategory.Privacy,
+            Description = "Windows search stops looking in your Microsoft and work/school account content.",
+            ExpectedEffect = "Search shows only what's on this PC, and doesn't query your OneDrive, Outlook or Bing account history.",
+            Explanation = "Same as Settings → Privacy & security → Search permissions → Cloud content search (both Microsoft account and work or school account).",
+            Ops =
+            [
+                RegOp.DWord(Hive.HKCU, @"Software\Microsoft\Windows\CurrentVersion\SearchSettings", "IsMSACloudSearchEnabled", 0, 1),
+                RegOp.DWord(Hive.HKCU, @"Software\Microsoft\Windows\CurrentVersion\SearchSettings", "IsAADCloudSearchEnabled", 0, 1),
+            ],
+        },
+        new()
+        {
+            Id = "privacy.searchhistory", Name = "Turn off search history on this device", Category = TweakCategory.Privacy,
+            Description = "Windows search stops remembering what you searched for on this PC.",
+            ExpectedEffect = "No saved search history. Search results lose past-search shortcuts.",
+            Explanation = "Same as Settings → Privacy & security → Search permissions → History → \"Search history on this device\".",
+            Ops = [RegOp.DWord(Hive.HKCU, @"Software\Microsoft\Windows\CurrentVersion\SearchSettings", "IsDeviceSearchHistoryEnabled", 0, 1)],
         },
     ];
 }
