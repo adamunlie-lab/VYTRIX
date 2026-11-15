@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VYTRIX privacy policy</title>
+<link rel="stylesheet" href="../site.css">
+</head>
+<body>
+<main class="page">
+  <a class="brand" href="../"><span class="mark">V</span>VYTRIX</a>
+  <h1>Privacy policy</h1>
+  <p class="dim">Effective November 15, 2026. This summarises section 6 of the <a href="../terms/">VYTRIX Terms of Agreement</a>, which is the full and binding text.</p>
+
+  <h2>The short version</h2>
+  <ul>
+    <li>VYTRIX has no analytics, telemetry or advertising, and never sells personal data.</li>
+    <li>Everything VYTRIX creates on your PC (settings, change history, backups, logs, reports) stays on your PC.</li>
+    <li>Your VYTRIX account stores your email address, what your sign-in provider shares, and the setup you sync. Nothing else.</li>
+    <li>You can delete your synced data, or your whole account, at any time from the Account page in VYTRIX.</li>
+  </ul>
+
+  <h2>Your VYTRIX account</h2>
+  <p>VYTRIX needs a free account. The account service runs on <a href="https://supabase.com">Supabase</a> and stores:</p>
+  <ul>
+    <li>your email address, and your password in hashed form if you sign up with email;</li>
+    <li>if you use <b>Sign in with Google</b> (or another provider): your name, email address and profile picture as that provider shares them. VYTRIX uses these only to sign you in and show which account you're using. It does not access your Gmail, Drive, contacts or any other Google data;</li>
+    <li>the setup you sync: which tweaks are on, your Custom profile, your appearance settings and a short label naming your graphics card.</li>
+  </ul>
+  <p>It never stores your files, passwords for other services, your computer name or your AI Assistant conversations. With <b>Sync automatically</b> on (the default), VYTRIX saves your setup to your account a few seconds after you change it; you can turn this off on the Account page. A synced setup only changes another PC when you choose to load it there.</p>
+  <p>Each account can only read and change its own data (enforced by the database's row-level security). Account data is not shared with anyone else, and is used for nothing except signing in and syncing.</p>
+
+  <h2>Network activity</h2>
+  <ul>
+    <li><b>Updates:</b> unless you turn them off, VYTRIX checks GitHub for new versions. GitHub sees your IP address and the VYTRIX version, like any website.</li>
+    <li><b>Network tools:</b> latency tests ping your router, public DNS providers and www.microsoft.com, only when you run them.</li>
+    <li><b>AI Assistant:</b> the free mode runs on your own PC. The optional Gemini and Claude modes send your messages (and, if you allow it, PC details) to Google or Anthropic using your own API key, under your own agreement with them.</li>
+  </ul>
+
+  <h2>Deleting your data</h2>
+  <p>In VYTRIX, open <b>Account</b>: <b>Delete my synced data</b> removes your saved setup, and <b>Delete my account</b> removes your account and everything saved to it. Uninstalling VYTRIX and deleting <code>%LocalAppData%\VYTRIX</code> removes everything stored on your PC.</p>
+
+  <h2>Contact</h2>
+  <p>Questions about privacy: open an issue on the <a href="https://github.com/adamunlie-lab/VYTRIX/issues">VYTRIX GitHub page</a>.</p>
+
+  <p class="foot"><a href="../">Home</a> · <a href="../terms/">Terms of Agreement</a></p>
+</main>
+</body>
+</html>

@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VYTRIX Terms of Agreement</title>
+<link rel="stylesheet" href="../site.css">
+</head>
+<body>
+<main class="page">
+  <a class="brand" href="../"><span class="mark">V</span>VYTRIX</a>
+  <h1>Terms of Agreement</h1>
+  <p class="dim">The same Terms VYTRIX shows when you install and start it. Privacy is covered in section 6; there's also a <a href="../privacy/">plain-language privacy summary</a>.</p>
+<pre>
+VYTRIX TERMS OF AGREEMENT
+Version 1.6 - Effective November 15, 2026
+
+Please read these Terms carefully. By installing, copying or using VYTRIX
+("the Software") you agree to these Terms. If you do not agree, do not
+install or use the Software.
+
+
+1. WHAT VYTRIX DOES
+
+VYTRIX is a Windows optimization utility. When you ask it to, it can
+change Windows settings, including registry values, power plans, DNS
+servers, startup entries, Windows service startup types and temporary
+files. Each control describes what it changes, and tweaks, profiles,
+DNS, service and cleanup actions ask for confirmation first
+(confirmation for low-risk tweaks can be turned off in Settings). Changes to
+machine-wide settings require administrator rights, which Windows asks
+you to grant.
+
+
+2. LICENSE
+
+You are granted a personal, non-exclusive, non-transferable, revocable
+license to install and use the Software on computers that you own or are
+authorized to administer.
+
+You may not:
+  (a) sell, rent, lease or sublicense the Software;
+  (b) remove or alter any copyright notice, branding or these Terms;
+  (c) redistribute a modified version of the Software under the VYTRIX
+      name or branding;
+  (d) use the Software to modify a computer you are not authorized to
+      administer.
+
+
+3. YOUR RESPONSIBILITIES
+
+  (a) You are responsible for reviewing each change before you confirm it.
+      Every tweak lists its exact effect, risk level and compatibility.
+  (b) You should keep your own backups of important files. VYTRIX's
+      cleanup tools only target system temporary and cache locations,
+      but deleted files cannot be recovered.
+  (c) Settings marked "Moderate" or "Advanced" risk involve trade-offs,
+      such as higher power use or heat. Apply them only if you understand
+      and accept those trade-offs.
+  (d) Laptop users should note that performance settings reduce battery
+      life.
+
+
+4. BACKUPS, ROLLBACK AND THEIR LIMITS
+
+VYTRIX records the previous value of every setting it changes, exports
+registry backups, and can create Windows System Restore points. These
+features are provided to help you undo changes. However:
+
+  (a) Some actions cannot be reversed. These include deleting temporary
+      files, emptying the Recycle Bin, ending a running app (unsaved
+      work in it is lost) and resetting Winsock. VYTRIX asks for
+      confirmation first and records these in the journal as not
+      reversible.
+  (b) Rollback restores the values VYTRIX recorded. If other software,
+      Windows Update or you change the same setting afterwards, rollback
+      may overwrite that later change.
+  (c) Windows may skip creating a restore point if one was created in
+      the last 24 hours, or if System Protection is turned off. VYTRIX
+      reports when this happens.
+  (d) Before uninstalling, use Restore Center &gt; "Roll back everything"
+      if you want Windows returned to its previous configuration.
+      Uninstalling does not undo changes on its own.
+
+
+5. SAFETY COMMITMENTS
+
+VYTRIX is designed so that it:
+  (a) never disables Windows Defender, Windows Firewall, Windows Update
+      or other security and core services;
+  (b) never deletes personal files such as documents, pictures, videos,
+      music, downloads or desktop items;
+  (c) never reports a hardware reading it could not actually measure;
+      unavailable sensors are labelled "Unavailable";
+  (d) never changes Windows on its own: every change starts with an
+      action you take, on a control that describes what it changes.
+
+These commitments describe how the Software is designed. They do not
+create a warranty (see section 8).
+
+
+6. PRIVACY
+
+  (a) VYTRIX does not collect or sell personal data. It has no
+      analytics, telemetry or advertising, and nothing about you is sent
+      anywhere except as described in this section.
+  (b) All data VYTRIX creates (settings, change journal, registry
+      backups, logs and reports) is stored locally on your computer in
+      %LocalAppData%\VYTRIX and Documents\VYTRIX Reports. You can delete
+      it at any time.
+  (c) Network activity happens only when you start it. Latency
+      diagnostics send standard ping requests to your router, to
+      public DNS providers (Cloudflare, Google) and to www.microsoft.com
+      to test name resolution, and DNS lookups go to
+      the servers you choose.
+  (d) Update checks: unless you turn them off in Settings &gt; Updates,
+      VYTRIX checks GitHub (github.com) for a newer release when it
+      starts and every 6 hours while it is open, and may download a new
+      installer in the background. These are ordinary web requests: like
+      any website, GitHub receives your IP address and the VYTRIX version
+      number. No other information is sent.
+  (e) AI assistant, free mode: by default the Assistant runs an open AI
+      model on your own computer through Ollama, a free third-party app
+      you choose to install. Your questions and your PC's details stay on
+      your computer. Setting it up downloads Ollama and the model you
+      pick (several gigabytes) from Ollama's servers.
+  (f) AI assistant, Gemini mode (optional): only if you enter your own
+      free Google AI Studio API key, your messages are sent to Google to
+      generate answers, under your own agreement with Google. On Google's
+      free tier, Google may use what you send to improve its products and
+      applies daily usage limits. If "Share PC details" is on (you can
+      turn it off at any time), it may also send the same PC details
+      listed for Claude mode below. Your key is stored on this computer,
+      encrypted for your Windows account, and only sent to Google.
+  (g) AI assistant, Claude mode (optional): only if you enter your own
+      Anthropic API key, your messages are sent to Anthropic, PBC to
+      generate answers, under your own agreement with Anthropic, and
+      usage is billed to your Anthropic account. If "Share PC details"
+      is on (you can turn it off at any time), it may also send your
+      hardware models, live readings, disk space, Windows version, tweak
+      states, the names and memory use of your top running apps, and
+      VYTRIX's change history. It never sends your files, your computer
+      name, your Windows user name or your API key to anyone but
+      Anthropic. Your key is stored on this computer, encrypted for your
+      Windows account, and you can remove it at any time.
+  (h) In every mode, AI answers can be wrong. The Assistant can only
+      suggest changes, and each one still needs your click and
+      confirmation.
+  (i) Accounts: VYTRIX requires a free VYTRIX account and opens on a
+      sign-in screen until you sign in. VYTRIX remembers your sign-in on
+      this computer (encrypted for your Windows account) until you sign
+      out, so you only need an internet connection to sign in. The
+      account service run for VYTRIX (hosted by
+      Supabase) stores your email address, the name and picture your
+      sign-in provider shares (Google, Microsoft, GitHub or Discord), and
+      the setup you choose to sync: which tweaks are on, your Custom
+      profile, your appearance settings and a short label naming your
+      graphics card. It never stores your files, passwords, computer
+      name or Assistant conversations. With "Sync automatically" on (the
+      default), VYTRIX saves this computer's setup to your account a few
+      seconds after you change it; you can turn this off on the Account
+      page. A synced setup only changes another PC when you choose to
+      load it there, and its tweaks still wait for your review. You can delete your synced data, or your whole
+      account, at any time from the Account page.
+  (j) System reports you export may contain hardware details, installed
+      application names and your computer name. Review a report before
+      sharing it with anyone.
+
+
+7. THIRD-PARTY COMPONENTS
+
+VYTRIX uses components of Windows (such as powercfg, netsh, ipconfig,
+winsat and System Restore) and, where present, the NVIDIA Management
+Library (NVML) installed with NVIDIA graphics drivers. These components
+are provided by their respective owners under their own terms. The
+Assistant's free mode uses Ollama and openly licensed AI models (such as
+Qwen), each under its own license. Its optional Gemini mode uses Gemini,
+provided by Google under Google's own terms, and its optional Claude
+mode uses Claude, provided by Anthropic, PBC under Anthropic's own terms
+and usage policies. VYTRIX is
+not affiliated with, endorsed by or sponsored by Microsoft, NVIDIA, AMD,
+Intel, Google, Anthropic, Ollama or any other hardware or software vendor. All trademarks belong to
+their respective owners.
+
+
+8. NO WARRANTY
+
+THE SOFTWARE IS PROVIDED "AS IS" AND "AS AVAILABLE", WITHOUT WARRANTY
+OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO WARRANTIES
+OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, NON-INFRINGEMENT,
+ACCURACY OF HARDWARE READINGS, OR THAT THE SOFTWARE WILL IMPROVE
+PERFORMANCE. Results depend on your hardware, drivers, Windows version
+and workload. Some changes produce no noticeable difference on some
+systems.
+
+
+9. LIMITATION OF LIABILITY
+
+TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS OF VYTRIX BE LIABLE FOR ANY INDIRECT,
+INCIDENTAL, SPECIAL, CONSEQUENTIAL OR PUNITIVE DAMAGES, OR FOR ANY LOSS
+OF DATA, PROFITS, OR USE, OR SYSTEM DAMAGE OR INSTABILITY, ARISING OUT OF
+OR IN CONNECTION WITH THE USE OF OR INABILITY TO USE THE SOFTWARE, EVEN
+IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
+
+Some jurisdictions do not allow the exclusion of certain warranties or
+the limitation of certain damages. In those jurisdictions, the above
+exclusions and limitations apply only to the extent permitted by law,
+and nothing in these Terms limits rights you have as a consumer that
+cannot be waived.
+
+
+10. UPDATES
+
+VYTRIX checks for new versions published on its GitHub releases page.
+Installers are downloaded only from GitHub release hosting and are
+verified against a SHA-256 checksum before they can run. An update is
+installed only after you choose "Install now" and approve the Windows
+administrator prompt; it never installs on its own. You can turn off
+automatic checks and background downloads in Settings &gt; Updates. Updated
+versions may come with revised Terms, which you will be asked to accept.
+
+
+11. TERMINATION
+
+This license ends automatically if you breach these Terms. You may end
+it at any time by uninstalling the Software. Sections 4, 8, 9 and 12
+continue to apply after termination.
+
+
+12. GENERAL
+
+  (a) These Terms are the entire agreement between you and the authors
+      of VYTRIX about the Software.
+  (b) If any part of these Terms is found unenforceable, the rest
+      remains in effect.
+  (c) Failure to enforce any part of these Terms is not a waiver of it.
+  (d) The authors may update these Terms in future versions. A new
+      version applies only once you accept it in the Software.
+
+
+Copyright (c) 2026 VYTRIX. All rights reserved.
+
+</pre>
+  <p class="foot"><a href="../">Home</a> &middot; <a href="../privacy/">Privacy policy</a></p>
+</main>
+</body>
+</html>

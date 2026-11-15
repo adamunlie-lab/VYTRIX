@@ -1,0 +1,15 @@
+:root { --bg:#0b0f0e; --card:#121816; --line:#26302d; --text:#eef2f0; --dim:#a7b3ae; --accent:#e23d4f; }
+* { box-sizing: border-box; }
+body { margin:0; background:var(--bg); color:var(--text); font:16px/1.6 "Segoe UI", system-ui, sans-serif; }
+.page { max-width:760px; margin:0 auto; padding:32px 16px 48px; }
+.brand { display:inline-flex; align-items:center; gap:10px; font-weight:600; letter-spacing:.5px; color:var(--text); text-decoration:none; margin-bottom:24px; }
+.mark { width:34px; height:34px; border-radius:9px; background:#1b2320; border:1px solid var(--line); display:grid; place-items:center; color:#f2c14e; font-weight:700; }
+h1 { font-size:30px; margin:0 0 8px; }
+h2 { font-size:20px; margin:28px 0 8px; }
+p, li { color:var(--text); }
+.dim { color:var(--dim); }
+a { color:#ff7a88; }
+code { background:#1b2320; padding:1px 5px; border-radius:4px; }
+pre { white-space:pre-wrap; background:var(--card); border:1px solid var(--line); border-radius:10px; padding:18px; font:13px/1.55 Consolas, "Cascadia Mono", monospace; color:var(--text); overflow-wrap:anywhere; }
+.button { display:inline-block; background:var(--accent); color:#fff; text-decoration:none; font-weight:600; padding:11px 20px; border-radius:8px; margin:8px 0; }
+.foot { margin-top:36px; color:var(--dim); font-size:14px; }
