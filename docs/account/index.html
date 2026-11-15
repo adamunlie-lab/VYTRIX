@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<meta name="robots" content="noindex">
+<title>VYTRIX account</title>
+<style>
+  :root { --bg:#0b0f0e; --card:#121816; --line:#26302d; --text:#eef2f0; --dim:#a7b3ae; --accent:#e23d4f; --good:#3fbf7f; --bad:#ff6b6b; }
+  * { box-sizing: border-box; }
+  body { margin:0; min-height:100vh; display:flex; align-items:center; justify-content:center; padding:16px;
+         background:var(--bg); color:var(--text); font:15px/1.5 "Segoe UI", system-ui, sans-serif; }
+  .card { width:100%; max-width:400px; background:var(--card); border:1px solid var(--line); border-radius:14px; padding:28px; }
+  .brand { display:flex; align-items:center; gap:10px; margin-bottom:22px; font-weight:600; letter-spacing:.5px; }
+  .mark { width:34px; height:34px; border-radius:9px; background:#1b2320; border:1px solid var(--line); display:grid; place-items:center; color:#f2c14e; font-weight:700; }
+  h1 { font-size:22px; margin:0 0 6px; }
+  p { color:var(--dim); margin:0 0 14px; }
+  label { display:block; font-size:13px; color:var(--dim); margin:14px 0 6px; }
+  input { width:100%; height:40px; border-radius:8px; border:1px solid var(--line); background:#0e1312; color:var(--text); padding:0 12px; font-size:15px; }
+  input:focus { outline:2px solid var(--accent); outline-offset:-1px; }
+  button { width:100%; height:42px; margin-top:18px; border:0; border-radius:8px; background:var(--accent); color:#fff; font-size:15px; font-weight:600; cursor:pointer; }
+  button:disabled { opacity:.6; cursor:default; }
+  .msg { margin-top:14px; padding:10px 12px; border-radius:8px; font-size:14px; display:none; }
+  .msg.bad { display:block; background:#3a1a1d; color:#ffd2d2; }
+  .msg.good { display:block; background:#163325; color:#c9f5dc; }
+  .hidden { display:none; }
+</style>
+</head>
+<body>
+<main class="card">
+  <div class="brand"><div class="mark">V</div>VYTRIX</div>
+
+  <section id="reset" class="hidden">
+    <h1>Choose a new password</h1>
+    <p>Pick a new password for your VYTRIX account, then sign in with it in VYTRIX.</p>
+    <form id="form" autocomplete="off">
+      <label for="pw">New password (at least 8 characters)</label>
+      <input id="pw" type="password" autocomplete="new-password" minlength="8" required>
+      <label for="pw2">Confirm new password</label>
+      <input id="pw2" type="password" autocomplete="new-password" minlength="8" required>
+      <button id="save" type="submit">Save new password</button>
+    </form>
+    <div id="msg" class="msg"></div>
+  </section>
+
+  <section id="done" class="hidden">
+    <h1>Password changed</h1>
+    <p>Go back to VYTRIX and sign in with your new password. You can close this page.</p>
+  </section>
+
+  <section id="confirmed" class="hidden">
+    <h1>Email confirmed</h1>
+    <p>Your VYTRIX account is ready. Go back to VYTRIX and sign in. You can close this page.</p>
+  </section>
+
+  <section id="problem" class="hidden">
+    <h1>This link didn't work</h1>
+    <p id="problemText">The link has expired or was already used.</p>
+    <p>In VYTRIX, click <b>Forgot password?</b> (or <b>Send the email again</b>) to get a new one. Links work once and expire after an hour.</p>
+  </section>
+
+  <section id="idle" class="hidden">
+    <h1>VYTRIX account</h1>
+    <p>This page finishes password resets and email confirmations from VYTRIX emails. Open it from the link in your email.</p>
+  </section>
+</main>
+<script>
+(() => {
+  // The account server and its public ("publishable") key. Row Level Security protects all data.
+  const SUPABASE = "https://inlogccnzhtxxasmcjiq.supabase.co";
+  const KEY = "sb_publishable_1AkeH7Y86c1Bdj4OXIDBjQ_bwPnnr5z";
+
+  const show = id => { for (const s of document.querySelectorAll("section")) s.classList.toggle("hidden", s.id !== id); };
+  const hash = new URLSearchParams(location.hash.slice(1));
+  const query = new URLSearchParams(location.search);
+  // Keep the one-time sign-in out of the address bar and history.
+  if (location.hash || location.search) history.replaceState(null, "", location.pathname);
+
+  const error = hash.get("error_description") || query.get("error_description");
+  const type = hash.get("type");
+  const token = hash.get("access_token");
+
+  if (error) { document.getElementById("problemText").textContent = error.replace(/\+/g, " ") + "."; show("problem"); return; }
+  if (token && type === "recovery") show("reset");
+  else if (token || type === "signup") { show("confirmed"); if (token) signOut(token); }
+  else { show("idle"); return; }
+
+  const msg = document.getElementById("msg");
+  const say = (text, kind) => { msg.textContent = text; msg.className = "msg " + kind; };
+
+  async function signOut(t) {
+    // The link signed this browser in; sign that session out so only VYTRIX stays signed in.
+    try { await fetch(SUPABASE + "/auth/v1/logout?scope=local", { method: "POST", headers: { apikey: KEY, Authorization: "Bearer " + t } }); } catch (_) {}
+  }
+
+  document.getElementById("form").addEventListener("submit", async e => {
+    e.preventDefault();
+    const pw = document.getElementById("pw").value, pw2 = document.getElementById("pw2").value;
+    if (pw.length < 8) return say("Use a password of at least 8 characters.", "bad");
+    if (pw !== pw2) return say("The passwords don't match.", "bad");
+    const btn = document.getElementById("save");
+    btn.disabled = true; btn.textContent = "Saving…";
+    try {
+      const r = await fetch(SUPABASE + "/auth/v1/user", {
+        method: "PUT",
+        headers: { apikey: KEY, Authorization: "Bearer " + token, "Content-Type": "application/json" },
+        body: JSON.stringify({ password: pw }),
+      });
+      if (r.ok) { await signOut(token); show("done"); return; }
+      const body = await r.json().catch(() => ({}));
+      const text = body.msg || body.error_description || body.message || "";
+      if (/different/i.test(text)) say("Choose a password that's different from your old one.", "bad");
+      else if (r.status === 401 || r.status === 403) { document.getElementById("problemText").textContent = "This reset link has expired."; show("problem"); }
+      else say(text || "Couldn't save the password. Try again.", "bad");
+    } catch (_) {
+      say("Couldn't reach the account server. Check your internet connection and try again.", "bad");
+    } finally { btn.disabled = false; btn.textContent = "Save new password"; }
+  });
+})();
+</script>
+</body>
+</html>

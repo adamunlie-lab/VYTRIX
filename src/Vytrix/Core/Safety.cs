@@ -310,6 +310,12 @@ public sealed class AppSettings
     public bool SeasonalThemes { get; set; } = true;
     /// <summary>True when the New Year theme was chosen by the seasonal switch (so it may be switched back).</summary>
     public bool NewYearThemeAutomatic { get; set; }
+    /// <summary>Save this PC's setup to the account when it changes, and offer newer setups from other PCs.</summary>
+    public bool AutoSync { get; set; } = true;
+    /// <summary>The account, time and contents of the last sync, so only real changes are uploaded.</summary>
+    public string LastSyncedUser { get; set; } = "";
+    public DateTime? LastSyncedAt { get; set; }
+    public string LastSyncedFingerprint { get; set; } = "";
 }
 
 /// <summary>The VYTRIX Terms of Agreement (legal\TERMS.txt, embedded at build time).</summary>

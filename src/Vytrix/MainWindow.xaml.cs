@@ -69,6 +69,8 @@ public partial class MainWindow : Window
                 if (await ShowTermsAsync(requireAcceptance: true)) Terms.Accept();
                 else { Log.Info("terms", "Terms declined; exiting."); Application.Current.Shutdown(); return; }
             }
+            // Automatic sync: offer a newer setup from another PC, then save this PC's changes as they happen.
+            await StartAutoSyncAsync();
             // Automatic updates: check now, then every 6 hours while VYTRIX is open.
             if (Settings.Current.CheckUpdatesOnStart)
             {
@@ -79,6 +81,9 @@ public partial class MainWindow : Window
             }
         };
     }
+
+    public Task StartAutoSyncAsync() =>
+        AutoSync.Instance.StartAsync(Dispatcher, remote => Views.AccountPage.OfferLoadAsync(this, remote, automatic: true));
 
     // ───────────────────────── Auto-update
 

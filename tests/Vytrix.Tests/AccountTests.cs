@@ -63,6 +63,75 @@ public class AccountTests
     }
 
     [Fact]
+    public async Task A_reset_code_sets_the_new_password_and_signs_in()
+    {
+        using var fake = new AssistantTests.FakeClaude((200, Tokens(access: "recovery-access")), (200, """{"id":"user-1"}"""));
+        var (svc, store) = New(fake.Url);
+        await svc.ResetPasswordWithCodeAsync(" gamer@example.com ", " 123 456 ", "new password 1");
+
+        Assert.Equal("/auth/v1/verify", fake.Paths[0]);
+        var verify = fake.Requests[0].Body.RootElement;
+        Assert.Equal("recovery", verify.GetProperty("type").GetString());
+        Assert.Equal("gamer@example.com", verify.GetProperty("email").GetString());
+        Assert.Equal("123456", verify.GetProperty("token").GetString());         // spaces typed in the code are ignored
+        Assert.Equal("/auth/v1/user", fake.Paths[1]);
+        Assert.Equal("Bearer recovery-access", fake.Requests[1].Headers["authorization"]);
+        Assert.Equal("new password 1", fake.Requests[1].Body.RootElement.GetProperty("password").GetString());
+        Assert.True(svc.SignedIn);
+        store.Delete();
+    }
+
+    [Fact]
+    public async Task A_wrong_or_expired_code_is_explained_and_does_not_sign_in()
+    {
+        using var fake = new AssistantTests.FakeClaude((403, """{"code":403,"error_code":"otp_expired","msg":"Token has expired or is invalid"}"""));
+        var (svc, store) = New(fake.Url);
+        var ex = await Assert.ThrowsAsync<AccountException>(() => svc.ResetPasswordWithCodeAsync("gamer@example.com", "111111", "new password 1"));
+        Assert.Equal(AccountService.BadCodeMessage, ex.Message);
+        Assert.Single(fake.Paths);                                               // the password is never sent
+        Assert.False(svc.SignedIn);
+        await Assert.ThrowsAsync<AccountException>(() => svc.ConfirmSignUpAsync("gamer@example.com", "12"));   // too short: not sent
+        Assert.Single(fake.Paths);
+        store.Delete();
+    }
+
+    [Fact]
+    public async Task A_signup_code_confirms_the_account_and_a_new_code_can_be_sent()
+    {
+        using var fake = new AssistantTests.FakeClaude((200, "{}"), (200, Tokens()));
+        var (svc, store) = New(fake.Url);
+        await svc.ResendSignUpCodeAsync("gamer@example.com");
+        Assert.Equal("/auth/v1/resend", fake.Paths[0]);
+        Assert.Equal("signup", fake.Requests[0].Body.RootElement.GetProperty("type").GetString());
+
+        await svc.ConfirmSignUpAsync("gamer@example.com", "654321");
+        Assert.Equal("signup", fake.Requests[1].Body.RootElement.GetProperty("type").GetString());
+        Assert.True(svc.SignedIn);
+        store.Delete();
+    }
+
+    [Fact]
+    public void Signing_in_before_confirming_points_to_the_code()
+    {
+        var msg = AccountService.Friendly(System.Net.HttpStatusCode.BadRequest, """{"error":"invalid_grant","error_description":"Email not confirmed"}""");
+        Assert.Equal(AccountService.NotConfirmedMessage, msg);
+    }
+
+    [Fact]
+    public void Sync_fingerprint_ignores_time_device_and_key_order()
+    {
+        var tweaks = new TweakSetupFile { Format = TweakSetupFile.FormatName, Tweaks = ["b", "a"], PowerPlan = "performance" };
+        var a = new SyncedSetup(tweaks, new JsonObject { ["theme"] = "Christmas", ["musicVolume"] = 0.15 }, "PC with RTX", DateTime.UtcNow);
+        var b = new SyncedSetup(tweaks with { Tweaks = ["a", "b"], Exported = DateTime.Now.AddDays(-3) },
+                                new JsonObject { ["musicVolume"] = 0.150, ["theme"] = "Christmas" }, "Windows PC", DateTime.UtcNow.AddDays(-1));
+        Assert.Equal(AutoSync.Fingerprint(a), AutoSync.Fingerprint(b));
+        var c = b with { Appearance = new JsonObject { ["musicVolume"] = 0.15, ["theme"] = "Graphite" } };
+        Assert.NotEqual(AutoSync.Fingerprint(a), AutoSync.Fingerprint(c));
+        var d = b with { Tweaks = tweaks with { Tweaks = ["a"] } };
+        Assert.NotEqual(AutoSync.Fingerprint(a), AutoSync.Fingerprint(d));
+    }
+
+    [Fact]
     public async Task A_saved_session_the_server_rejects_is_signed_out_at_start()
     {
         using var fake = new AssistantTests.FakeClaude((200, Tokens()), (400, """{"error":"invalid_grant","error_description":"Invalid Refresh Token"}"""));

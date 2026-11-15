@@ -15,7 +15,7 @@ namespace Vytrix;
 /// </summary>
 public sealed class SignInWindow : Window
 {
-    private enum Mode { SignIn, Create, Forgot, CheckEmail }
+    private enum Mode { SignIn, Create, Forgot, ResetSent, ResetCode, CheckEmail, SignUpCode }
 
     private static AccountService Svc => AccountService.Instance;
 
@@ -24,6 +24,7 @@ public sealed class SignInWindow : Window
     private Action<bool>? _setSceneRunning;
     private Mode _mode = Mode.SignIn;
     private string _email = "";
+    private string _code = "";
     private string? _message;
     private bool _messageIsError;
     private bool _busy;
@@ -161,6 +162,9 @@ public sealed class SignInWindow : Window
         {
             case Mode.CheckEmail: RenderCheckEmail(); return;
             case Mode.Forgot: RenderForgot(); return;
+            case Mode.ResetSent: RenderResetSent(); return;
+            case Mode.ResetCode: RenderResetCode(); return;
+            case Mode.SignUpCode: RenderSignUpCode(); return;
         }
         bool create = _mode == Mode.Create;
         _form.Children.Add(Heading(create ? "Create your account" : "Sign in to VYTRIX",
@@ -263,7 +267,7 @@ public sealed class SignInWindow : Window
         _form.Children.Add(Heading("Reset your password", "We'll email you a link to choose a new password."));
         var email = Field("Email address", new TextBox { Text = _email, Tag = "you@example.com", Height = 38 });
         _form.Children.Add(email.Host);
-        var send = new Button { Content = "Send reset link", Style = Ui.Style("Primary"), HorizontalAlignment = HorizontalAlignment.Stretch, Padding = new Thickness(16, 10, 16, 10), Margin = new Thickness(0, 10, 0, 0), IsDefault = true };
+        var send = PrimaryButton("Email me a reset link");
         _form.Children.Add(send);
         AddMessage();
         send.Click += async (_, _) =>
@@ -274,24 +278,115 @@ public sealed class SignInWindow : Window
             await RunAsync(send, async () =>
             {
                 await Svc.SendPasswordResetAsync(address);
-                _mode = Mode.SignIn;
-                _message = "If that email has an account, a reset link is on its way. Open it, choose a new password, then sign in here.";
-                _messageIsError = false;
-            }, keepMessage: true);
+                _mode = Mode.ResetSent;
+                _message = null;
+            });
         };
         _form.Children.Add(BackLink());
         Dispatcher.BeginInvoke(() => email.Input.Focus(), System.Windows.Threading.DispatcherPriority.Input);
     }
 
+    /// <summary>The reset email is on its way: its link opens a page to choose a new password.</summary>
+    private void RenderResetSent()
+    {
+        _form.Children.Add(Heading("Check your email", null));
+        _form.Children.Add(Para($"If {_email} has a VYTRIX account, we've emailed it a reset link. Open the link, choose a new password on the page that opens, then sign in here with it."));
+        _form.Children.Add(Para("The link works once and expires after an hour. It can take a minute to arrive, so check your spam folder too."));
+        var back = PrimaryButton("Back to sign in");
+        back.Click += (_, _) => { _message = null; _mode = Mode.SignIn; Render(); };
+        _form.Children.Add(back);
+        AddMessage();
+        _form.Children.Add(SmallLink("Send the link again", async b => await RunAsync(b, async () =>
+        {
+            await Svc.SendPasswordResetAsync(_email);
+            _message = "Sent again. Use the link in the newest email.";
+            _messageIsError = false;
+        }, keepMessage: true)));
+        _form.Children.Add(SmallLink("Got a code instead?", _ => { _message = null; _code = ""; _mode = Mode.ResetCode; Render(); return Task.CompletedTask; }));
+    }
+
+    /// <summary>Type a reset code from the email and choose a new password; signs in when it works.</summary>
+    private void RenderResetCode()
+    {
+        _form.Children.Add(Heading("Choose a new password", $"Type the code from the email we sent to {_email}, then choose a new password."));
+        var code = CodeBox();
+        _form.Children.Add(Field("Code from the email", code).Host);
+        var pw = new PasswordBox { Height = 38 };
+        var pw2 = new PasswordBox { Height = 38 };
+        _form.Children.Add(Field("New password (at least 8 characters)", pw).Host);
+        _form.Children.Add(Field("Confirm new password", pw2).Host);
+        var save = PrimaryButton("Save password and sign in");
+        _form.Children.Add(save);
+        AddMessage();
+        save.Click += async (_, _) =>
+        {
+            _code = code.Text;
+            string? problem = code.Text.Count(char.IsDigit) < 6 ? "Enter the code from the email."
+                : pw.Password.Length < 8 ? "Use a password of at least 8 characters."
+                : pw2.Password != pw.Password ? "The passwords don't match."
+                : null;
+            if (problem is not null) { ShowMessage(problem, true); return; }
+            await RunAsync(save, () => Svc.ResetPasswordWithCodeAsync(_email, code.Text, pw.Password));
+        };
+        _form.Children.Add(BackLink());
+        Dispatcher.BeginInvoke(() => code.Focus(), System.Windows.Threading.DispatcherPriority.Input);
+    }
+
+    /// <summary>After creating an account: confirm it with the link in the email, then sign in.</summary>
     private void RenderCheckEmail()
     {
         _form.Children.Add(Heading("Check your email", null));
-        _form.Children.Add(Para($"We sent a confirmation link to {_email}. Open it to activate your account, then come back and sign in."));
+        _form.Children.Add(Para($"We sent a confirmation link to {_email}. Open it to confirm your account, then come back and sign in."));
         _form.Children.Add(Para("It can take a minute to arrive. Check your spam folder if you don't see it."));
-        var ok = new Button { Content = "I've confirmed my email, sign in", Style = Ui.Style("Primary"), HorizontalAlignment = HorizontalAlignment.Stretch, Padding = new Thickness(16, 10, 16, 10), Margin = new Thickness(0, 8, 0, 0), IsDefault = true };
+        var ok = PrimaryButton("I've confirmed my email, sign in");
         ok.Click += (_, _) => { _mode = Mode.SignIn; _message = null; Render(); };
         _form.Children.Add(ok);
+        AddMessage();
+        _form.Children.Add(SmallLink("Send the email again", async b => await RunAsync(b, async () =>
+        {
+            await Svc.ResendSignUpCodeAsync(_email);
+            _message = "Sent again. Use the link in the newest email.";
+            _messageIsError = false;
+        }, keepMessage: true)));
+        _form.Children.Add(SmallLink("Got a code instead?", _ => { _message = null; _code = ""; _mode = Mode.SignUpCode; Render(); return Task.CompletedTask; }));
     }
+
+    /// <summary>Type a confirmation code from the sign-up email; signs in when it works.</summary>
+    private void RenderSignUpCode()
+    {
+        _form.Children.Add(Heading("Enter your code", $"Type the code from the email we sent to {_email}."));
+        var code = CodeBox();
+        _form.Children.Add(Field("Code from the email", code).Host);
+        var ok = PrimaryButton("Confirm and sign in");
+        _form.Children.Add(ok);
+        AddMessage();
+        ok.Click += async (_, _) =>
+        {
+            _code = code.Text;
+            if (code.Text.Count(char.IsDigit) < 6) { ShowMessage("Enter the code from the email.", true); return; }
+            await RunAsync(ok, () => Svc.ConfirmSignUpAsync(_email, code.Text));
+        };
+        _form.Children.Add(BackLink());
+        Dispatcher.BeginInvoke(() => code.Focus(), System.Windows.Threading.DispatcherPriority.Input);
+    }
+
+    private static Button SmallLink(string text, Func<Button, Task> click)
+    {
+        var b = new Button { Content = text, Style = Ui.Style("Link"), HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 14, 0, 0) };
+        b.Click += async (_, _) => await click(b);
+        return b;
+    }
+
+    private TextBox CodeBox() => new()
+    {
+        Text = _code, Tag = "123456", Height = 44, MaxLength = 12, FontSize = 20, FontFamily = new FontFamily("Cascadia Mono, Consolas"),
+        HorizontalContentAlignment = HorizontalAlignment.Center,
+    };
+
+    private static Button PrimaryButton(string text) => new()
+    {
+        Content = text, Style = Ui.Style("Primary"), HorizontalAlignment = HorizontalAlignment.Stretch, Padding = new Thickness(16, 10, 16, 10), Margin = new Thickness(0, 10, 0, 0), IsDefault = true,
+    };
 
     // ───────────────────────── Helpers
 
@@ -312,6 +407,8 @@ public sealed class SignInWindow : Window
             Log.Warn("account", $"Sign-in action failed: {(ex is AccountException ? ex.Message : ex.GetType().Name)}");
             _message = ex is AccountException ? ex.Message : "Something went wrong. Check your connection and try again.";
             _messageIsError = true;
+            // Signing in before confirming the email goes to the code screen (with a way to get a new code).
+            if (_message == AccountService.NotConfirmedMessage) { _mode = Mode.CheckEmail; _code = ""; }
         }
         finally { _busy = false; b.IsEnabled = true; b.Content = label; }
 

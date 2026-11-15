@@ -168,8 +168,50 @@ public sealed class AccountService
         return false;
     }
 
+    /// <summary>Emails a password-reset code (the email shows a code to type into VYTRIX, not a link).</summary>
     public Task SendPasswordResetAsync(string email, CancellationToken ct = default) =>
         SendAsync(HttpMethod.Post, "/auth/v1/recover", new JsonObject { ["email"] = email.Trim() }, auth: false, ct);
+
+    /// <summary>Checks the reset code from the email, sets the new password, and signs in.</summary>
+    public async Task ResetPasswordWithCodeAsync(string email, string code, string newPassword, CancellationToken ct = default)
+    {
+        var tokens = await VerifyCodeAsync("recovery", email, code, ct);
+        var fresh = FromTokens(tokens, "email");
+        try { await SendAsync(HttpMethod.Put, "/auth/v1/user", new JsonObject { ["password"] = newPassword }, auth: true, ct, fresh.AccessToken); }
+        catch (AccountException a) when (a.Message.StartsWith("Choose a password that's different", StringComparison.Ordinal))
+        {
+            Log.Info("account", "New password matched the old one; signing in with it unchanged.");   // the code is used up, and the password still works
+        }
+        catch (AccountException a)
+        {
+            throw new AccountException($"{a.Message} The code has been used, so send a new one to try again.", a.Status);
+        }
+        Keep(fresh);
+        Log.Info("account", "Password reset with an email code; signed in.");
+    }
+
+    /// <summary>Confirms a new account with the code from its confirmation email, and signs in.</summary>
+    public async Task ConfirmSignUpAsync(string email, string code, CancellationToken ct = default)
+    {
+        var tokens = await VerifyCodeAsync("signup", email, code, ct);
+        Keep(FromTokens(tokens, "email"));
+        Log.Info("account", "Email confirmed with a code; signed in.");
+    }
+
+    /// <summary>Sends a fresh confirmation code for an account that isn't confirmed yet.</summary>
+    public Task ResendSignUpCodeAsync(string email, CancellationToken ct = default) =>
+        SendAsync(HttpMethod.Post, "/auth/v1/resend", new JsonObject { ["type"] = "signup", ["email"] = email.Trim() }, auth: false, ct);
+
+    private Task<JsonNode?> VerifyCodeAsync(string type, string email, string code, CancellationToken ct)
+    {
+        var digits = new string(code.Where(char.IsDigit).ToArray());
+        if (digits.Length is < 6 or > 10) throw new AccountException("Enter the code from the email.");
+        return SendAsync(HttpMethod.Post, "/auth/v1/verify", new JsonObject { ["type"] = type, ["email"] = email.Trim(), ["token"] = digits }, auth: false, ct);
+    }
+
+    /// <summary>The message shown when someone signs in before confirming their email.</summary>
+    public const string NotConfirmedMessage = "Confirm your email first: open the link we emailed you. Need a new one? Click Send the email again.";
+    public const string BadCodeMessage = "That code is wrong or has expired. Check the newest email, or ask for a new one.";
 
     public async Task SignOutAsync()
     {
@@ -331,7 +373,9 @@ public sealed class AccountService
         }
         catch { }
         if (msg is not null && msg.Contains("Invalid login credentials", StringComparison.OrdinalIgnoreCase)) return "That email and password don't match an account.";
-        if (msg is not null && msg.Contains("Email not confirmed", StringComparison.OrdinalIgnoreCase)) return "Confirm your email first: open the link we sent you, then sign in.";
+        if (msg is not null && msg.Contains("Email not confirmed", StringComparison.OrdinalIgnoreCase)) return NotConfirmedMessage;
+        if (msg is not null && (msg.Contains("expired or is invalid", StringComparison.OrdinalIgnoreCase) || msg.Contains("otp", StringComparison.OrdinalIgnoreCase))) return BadCodeMessage;
+        if (msg is not null && msg.Contains("should be different", StringComparison.OrdinalIgnoreCase)) return "Choose a password that's different from your old one.";
         if (msg is not null && msg.Contains("already registered", StringComparison.OrdinalIgnoreCase)) return "There's already an account with that email. Sign in instead.";
         if (status == HttpStatusCode.TooManyRequests) return "Too many attempts. Wait a minute and try again.";
         if (status == HttpStatusCode.Unauthorized) return "Your sign-in has expired. Please sign in again.";
