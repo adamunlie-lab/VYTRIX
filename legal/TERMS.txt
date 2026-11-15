@@ -1,5 +1,5 @@
 VYTRIX TERMS OF AGREEMENT
-Version 1.5 - Effective November 15, 2026
+Version 1.6 - Effective November 15, 2026
 
 Please read these Terms carefully. By installing, copying or using VYTRIX
 ("the Software") you agree to these Terms. If you do not agree, do not
@@ -142,9 +142,11 @@ create a warranty (see section 8).
       the setup you choose to sync: which tweaks are on, your Custom
       profile, your appearance settings and a short label naming your
       graphics card. It never stores your files, passwords, computer
-      name or Assistant conversations. Synced data is only sent when you
-      choose to save it, and only changes another PC when you choose to
-      load it there. You can delete your synced data, or your whole
+      name or Assistant conversations. With "Sync automatically" on (the
+      default), VYTRIX saves this computer's setup to your account a few
+      seconds after you change it; you can turn this off on the Account
+      page. A synced setup only changes another PC when you choose to
+      load it there, and its tweaks still wait for your review. You can delete your synced data, or your whole
       account, at any time from the Account page.
   (j) System reports you export may contain hardware details, installed
       application names and your computer name. Review a report before

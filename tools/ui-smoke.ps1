@@ -40,13 +40,13 @@ function WaitWin { $w = $null; for ($i = 0; $i -lt 40 -and -not $w; $i++) { Star
 $fresh = New-QaDataDir
 $p = Launch
 $w = WaitWin
-Check 'First run shows Terms of Agreement' ($null -ne (FindByName $w 'VYTRIX Terms of Agreement (v1.5)'))
+Check 'First run shows Terms of Agreement' ($null -ne (FindByName $w 'VYTRIX Terms of Agreement (v1.6)'))
 $accept = FindButtonContaining $w 'Accept'
 Check 'Accept disabled until box is ticked' ($accept -and -not $accept.Current.IsEnabled)
 Shot 'terms-first-run'
 Invoke (FindButtonContaining $w 'Decline')
 Check 'Decline exits the app' ($p.WaitForExit(5000))
-Check 'Declining does not record acceptance' (-not ((Get-Content (Join-Path $fresh 'settings.json') -ErrorAction SilentlyContinue) -match '"acceptedTermsVersion": "1.5"'))
+Check 'Declining does not record acceptance' (-not ((Get-Content (Join-Path $fresh 'settings.json') -ErrorAction SilentlyContinue) -match '"acceptedTermsVersion": "1.6"'))
 $p = Launch
 $w = WaitWin
 $box = FindByName $w 'I have read and agree to the VYTRIX Terms of Agreement'
@@ -56,12 +56,12 @@ $accept = FindButtonContaining $w 'Accept'
 Check 'Ticking the box enables Accept' ($accept.Current.IsEnabled)
 Invoke $accept
 Start-Sleep -Milliseconds 800
-Check 'Accepting records version 1.5' ((Get-Content (Join-Path $fresh 'settings.json') -Raw) -match '"acceptedTermsVersion": "1.5"')
+Check 'Accepting records version 1.6' ((Get-Content (Join-Path $fresh 'settings.json') -Raw) -match '"acceptedTermsVersion": "1.6"')
 Check 'App stays open after accepting' (-not $p.HasExited)
 $p.CloseMainWindow() | Out-Null; $p.WaitForExit(5000) | Out-Null
 $p = Launch
 $w = WaitWin
-Check 'Terms not shown again once accepted' ($null -eq (FindByName $w 'VYTRIX Terms of Agreement (v1.5)'))
+Check 'Terms not shown again once accepted' ($null -eq (FindByName $w 'VYTRIX Terms of Agreement (v1.6)'))
 $p.CloseMainWindow() | Out-Null; $p.WaitForExit(5000) | Out-Null
 
 # 0b. Sign-in screen: with no saved session VYTRIX opens its separate sign-in window, not the main one.

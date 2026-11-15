@@ -31,6 +31,14 @@ http://127.0.0.1:*/**
 
 VYTRIX signs in through the browser and receives the result on a temporary local address (any free port), using PKCE. Nothing is exposed to the internet.
 
+Then set **Site URL** (same page) to the account page that finishes email links:
+
+```
+https://adamunlie-lab.github.io/VYTRIX/account/
+```
+
+That page is `docs/account/index.html`, served by GitHub Pages from the `docs` folder. Supabase's default emails only contain a link (their wording can't be changed until you set up custom SMTP). The confirmation link lands there and says the email is confirmed; the password-reset link opens a form there to choose a new password, then signs that browser session out. If you later set up custom SMTP, you can add `{{ .Token }}` to the *Confirm sign up* and *Reset password* templates: VYTRIX also accepts the code ("Got a code instead?").
+
 ## 4. Turn on sign-in methods
 
 Go to **Authentication → Sign In / Providers**. VYTRIX automatically shows a button for each method you enable:

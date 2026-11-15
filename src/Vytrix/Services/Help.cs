@@ -108,10 +108,11 @@ public static class HelpContent
             "account", "Open Account", "account sign in login sign out sync google microsoft github discord email password forgot reset delete cloud",
             new HelpSteps(
                 "VYTRIX opens on its sign-in screen. Sign in, or click **Create an account**, enter your email and a password, and open the confirmation link we email you.",
-                "Forgot your password? Click **Forgot password?** on the sign-in screen and we'll email you a reset link. VYTRIX remembers your sign-in, so you only sign in again after signing out.",
-                "On the PC that's set up the way you like, open **Account** and click **Save this PC's setup to my account**.",
-                "On another PC, sign in and click **Load my synced setup**. Your look is applied straight away, and your tweaks go into the Custom profile for you to review and apply."),
-            new HelpPara("An account stores your email, the setup you choose to save, and the name and picture your sign-in provider shares. Never your files, passwords, computer name or Assistant chats. You can delete your synced data or your whole account from the Account page.")),
+                "Forgot your password? Click **Forgot password?** on the sign-in screen. Open the link we email you, choose a new password on the page that opens, then sign in with it. VYTRIX remembers your sign-in, so you only sign in again after signing out.",
+                "Syncing is automatic: whenever you change a tweak or your look, VYTRIX saves this PC's setup to your account a few seconds later.",
+                "When you open VYTRIX on another PC and a newer setup was saved somewhere else, VYTRIX offers to load it. Your look is applied straight away, and the tweaks go into the Custom profile for you to review and apply."),
+            new HelpPara("Turn **Sync automatically** off on the **Account** page if you'd rather save and load by hand. The PC you changed most recently is the one your account keeps."),
+            new HelpPara("An account stores your email, your synced setup, and the name and picture your sign-in provider shares. Never your files, passwords, computer name or Assistant chats. You can delete your synced data or your whole account from the Account page.")),
 
         new("restore", "Undo anything", "IcoRestore",
             "Everything VYTRIX changes is recorded first, so you can always go back.",

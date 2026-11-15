@@ -19,7 +19,7 @@ function New-QaDataDir([switch]$TermsAccepted, [string]$Theme = '', [switch]$Sig
         # Update checks off: QA must not contact GitHub or show update prompts (the update test enables them itself).
         # The one-time theme introductions are marked done, so the requested theme isn't replaced at startup.
         $themeJson = if ($Theme) { ", `"theme`": `"$Theme`", `"seasonalThemes`": false, `"christmasIntroduced`": true, `"cherryBlossomIntroduced`": true" } else { '' }
-        ('{ "acceptedTermsVersion": "1.5", "acceptedTermsAt": "2026-01-01T00:00:00", "checkUpdatesOnStart": false, "gitHubFeedIntroduced": true' + $themeJson + ' }') | Set-Content (Join-Path $dir 'settings.json') -Encoding ascii
+        ('{ "acceptedTermsVersion": "1.6", "acceptedTermsAt": "2026-01-01T00:00:00", "checkUpdatesOnStart": false, "gitHubFeedIntroduced": true' + $themeJson + ' }') | Set-Content (Join-Path $dir 'settings.json') -Encoding ascii
     }
     # VYTRIX needs an account to open. QA copies get a saved test session (encrypted for this
     # Windows user, like the real one) and an account server address that refuses connections,
