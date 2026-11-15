@@ -1,5 +1,5 @@
 VYTRIX TERMS OF AGREEMENT
-Version 1.4 - Effective November 15, 2026
+Version 1.5 - Effective November 15, 2026
 
 Please read these Terms carefully. By installing, copying or using VYTRIX
 ("the Software") you agree to these Terms. If you do not agree, do not
@@ -132,8 +132,11 @@ create a warranty (see section 8).
   (h) In every mode, AI answers can be wrong. The Assistant can only
       suggest changes, and each one still needs your click and
       confirmation.
-  (i) Accounts (optional): you can use VYTRIX without an account. If you
-      create one, the account service run for VYTRIX (hosted by
+  (i) Accounts: VYTRIX requires a free VYTRIX account and opens on a
+      sign-in screen until you sign in. VYTRIX remembers your sign-in on
+      this computer (encrypted for your Windows account) until you sign
+      out, so you only need an internet connection to sign in. The
+      account service run for VYTRIX (hosted by
       Supabase) stores your email address, the name and picture your
       sign-in provider shares (Google, Microsoft, GitHub or Discord), and
       the setup you choose to sync: which tweaks are on, your Custom

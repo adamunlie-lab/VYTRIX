@@ -4,7 +4,7 @@ param([string]$OutDir = "$env:TEMP\vytrix-qa")
 Add-Type -AssemblyName UIAutomationClient, UIAutomationTypes
 . (Join-Path $PSScriptRoot 'qa-common.ps1')
 $data = New-QaDataDir -TermsAccepted
-'{ "acceptedTermsVersion": "1.4", "acceptedTermsAt": "2026-01-01T00:00:00", "checkUpdatesOnStart": false, "gitHubFeedIntroduced": true, "musicVolume": 0.15 }' | Set-Content (Join-Path $data 'settings.json') -Encoding ascii
+'{ "acceptedTermsVersion": "1.5", "acceptedTermsAt": "2026-01-01T00:00:00", "checkUpdatesOnStart": false, "gitHubFeedIntroduced": true, "musicVolume": 0.15 }' | Set-Content (Join-Path $data 'settings.json') -Encoding ascii
 $root = Split-Path $PSScriptRoot -Parent
 $exe = Get-ChildItem (Join-Path $root 'src\Vytrix\bin') -Recurse -Filter VYTRIX.exe | Sort-Object LastWriteTime -Descending | Select-Object -First 1
 Get-Process VYTRIX -ErrorAction SilentlyContinue | Stop-Process -Force

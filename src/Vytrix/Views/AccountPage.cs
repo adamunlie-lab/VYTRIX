@@ -6,11 +6,11 @@ using Vytrix.Services;
 
 namespace Vytrix.Views;
 
-/// <summary>Optional account: sign in several ways and sync your setup across PCs.</summary>
+/// <summary>The signed-in account: sync your setup across PCs, sign out, or delete your data.</summary>
 public sealed class AccountPage : PageBase
 {
     public override string PageTitle => "Account";
-    public override string PageSubtitle => "Optional. Sign in to keep your tweaks and look in sync across your PCs.";
+    public override string PageSubtitle => "Your VYTRIX account keeps your tweaks and look in sync across your PCs.";
 
     private readonly StackPanel _root = new();
     private AccountService Svc => AccountService.Instance;
@@ -28,109 +28,8 @@ public sealed class AccountPage : PageBase
     {
         if (_busy) return;
         _root.Children.Clear();
-        if (!AccountConfig.Configured) { RenderNotSetUp(); return; }
+        // Signing out returns VYTRIX to its sign-in screen, so this page only has a signed-in view.
         if (Svc.SignedIn) await RenderSignedInAsync();
-        else await RenderSignedOutAsync();
-    }
-
-    private void RenderNotSetUp()
-    {
-        var sp = new StackPanel();
-        sp.Children.Add(Para("Accounts let you sign in with Google, Microsoft, GitHub or email, and keep your tweak setup, theme and settings the same on every PC."));
-        sp.Children.Add(Para("They aren't switched on in this version of VYTRIX yet. Everything else works without an account, and you can still move your setup with **Settings → Move your setup to another PC**."));
-        _root.Children.Add(Kit.Card(sp, "Accounts are coming", "Nothing to do for now."));
-    }
-
-    // ───────────────────────── Signed out
-
-    private async Task RenderSignedOutAsync()
-    {
-        var card = new StackPanel();
-        card.Children.Add(Para("Sign in on each PC to sync your tweak setup, Custom profile, theme and appearance settings. Nothing is applied on a PC until you choose to, and tweaks always go through the usual review."));
-        var methodsHost = new StackPanel { Margin = new Thickness(0, 4, 0, 0) };
-        methodsHost.Children.Add(new Spinner { Width = 20, Height = 20, Stroke = Ui.Res("AccentBrush"), HorizontalAlignment = HorizontalAlignment.Left });
-        card.Children.Add(methodsHost);
-        _root.Children.Add(Kit.Card(card, "Sign in", "Choose how you'd like to sign in."));
-
-        List<SignInMethod> methods; bool emailOn, signupOff;
-        try { (methods, emailOn, signupOff) = await Svc.MethodsAsync(); }
-        catch (Exception ex)
-        {
-            methodsHost.Children.Clear();
-            methodsHost.Children.Add(Kit.Notice(ex is AccountException ? ex.Message : "Couldn't reach the account server.", "warn", Retry()));
-            return;
-        }
-        methodsHost.Children.Clear();
-
-        if (methods.Count > 0)
-        {
-            var wrap = new WrapPanel();
-            foreach (var m in methods)
-            {
-                var b = new Button { Content = $"Continue with {m.Label}", Style = Ui.Style("Ghost"), MinWidth = 210, Margin = new Thickness(0, 0, 10, 10), Padding = new Thickness(16, 9, 16, 9) };
-                var id = m.Id;
-                b.Click += async (_, _) => await RunAsync(b, async () =>
-                {
-                    Shell.Toast($"Finish signing in with {m.Label} in your browser.", ToastKind.Info);
-                    await Svc.SignInWithProviderAsync(id);
-                    Shell.Toast($"Signed in as {Svc.Session?.Email}.", ToastKind.Success);
-                });
-                wrap.Children.Add(b);
-            }
-            methodsHost.Children.Add(wrap);
-        }
-
-        if (emailOn)
-        {
-            if (methods.Count > 0) methodsHost.Children.Add(new TextBlock { Text = "OR USE EMAIL", Style = Ui.Style("Label"), Margin = new Thickness(0, 10, 0, 8) });
-            var email = new TextBox { Tag = "Email", Width = 320, HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(0, 0, 0, 8) };
-            var pw = new PasswordBox { Width = 320, Height = 36, HorizontalAlignment = HorizontalAlignment.Left, ToolTip = "Password (at least 8 characters)" };
-            var err = new TextBlock { Foreground = Ui.Res("BadBrush"), FontSize = 12, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 8, 0, 0), Visibility = Visibility.Collapsed };
-            methodsHost.Children.Add(email);
-            methodsHost.Children.Add(new TextBlock { Text = "Password (at least 8 characters)", Style = Ui.Style("Muted"), FontSize = 11.5, Margin = new Thickness(2, 0, 0, 4) });
-            methodsHost.Children.Add(pw);
-            var signIn = new Button { Content = "Sign in", Style = Ui.Style("Primary") };
-            var create = new Button { Content = "Create account", Style = Ui.Style("Ghost"), Margin = new Thickness(8, 0, 0, 0), Visibility = signupOff ? Visibility.Collapsed : Visibility.Visible };
-            var forgot = new Button { Content = "Forgot password?", Style = Ui.Style("Ghost"), Margin = new Thickness(8, 0, 0, 0) };
-            var row = Kit.Row(signIn, create, forgot);
-            row.Margin = new Thickness(0, 12, 0, 0);
-            methodsHost.Children.Add(row);
-            methodsHost.Children.Add(err);
-
-            bool Valid(bool needPassword)
-            {
-                var e = email.Text.Trim();
-                string? problem = !e.Contains('@') || e.Length < 5 ? "Enter your email address." : needPassword && pw.Password.Length < 8 ? "Use a password of at least 8 characters." : null;
-                err.Text = problem ?? "";
-                err.Visibility = problem is null ? Visibility.Collapsed : Visibility.Visible;
-                return problem is null;
-            }
-            signIn.Click += async (_, _) => { if (Valid(true)) await RunAsync(signIn, () => Svc.SignInWithEmailAsync(email.Text, pw.Password), err); };
-            create.Click += async (_, _) =>
-            {
-                if (!Valid(true)) return;
-                await RunAsync(create, async () =>
-                {
-                    bool signedIn = await Svc.SignUpWithEmailAsync(email.Text, pw.Password);
-                    Shell.Toast(signedIn ? "Account created. You're signed in." : "Check your email and open the confirmation link, then sign in here.", signedIn ? ToastKind.Success : ToastKind.Info);
-                }, err);
-            };
-            forgot.Click += async (_, _) =>
-            {
-                if (!Valid(false)) return;
-                await RunAsync(forgot, async () => { await Svc.SendPasswordResetAsync(email.Text); Shell.Toast("If that email has an account, a reset link is on its way.", ToastKind.Info); }, err);
-            };
-        }
-
-        if (methods.Count == 0 && !emailOn)
-            methodsHost.Children.Add(Kit.Notice("No sign-in methods are turned on for this account server yet.", "warn"));
-
-        var priv = new StackPanel();
-        priv.Children.Add(Para("Your account stores your email address (and your name and picture if your sign-in provider shares them), plus the setup you choose to sync: which tweaks are on, your Custom profile and your appearance settings. It never includes your files, passwords, computer name or the Assistant's conversations."));
-        priv.Children.Add(Para("You can delete your synced data, or your whole account, at any time from this page. Details are in the Terms of Agreement, section 6."));
-        var privCard = Kit.Card(priv, "What an account stores");
-        privCard.Margin = new Thickness(0, 14, 0, 0);
-        _root.Children.Add(privCard);
     }
 
     // ───────────────────────── Signed in
@@ -143,7 +42,11 @@ public sealed class AccountPage : PageBase
         who.Children.Add(new TextBlock { Text = s.Email.Length > 0 ? s.Email : "Signed in", Style = Ui.Style("H2") });
         who.Children.Add(new TextBlock { Text = $"Signed in with {provider}", Style = Ui.Style("Muted"), Margin = new Thickness(0, 3, 0, 0) });
         var signOut = new Button { Content = "Sign out", Style = Ui.Style("Ghost") };
-        signOut.Click += async (_, _) => await RunAsync(signOut, Svc.SignOutAsync);
+        signOut.Click += async (_, _) =>
+        {
+            if (!await Shell.ConfirmAsync("Sign out of VYTRIX?", "VYTRIX goes back to its sign-in screen. Tweaks you've applied stay on this PC.", "Sign out")) return;
+            await RunAsync(signOut, Svc.SignOutAsync);
+        };
         _root.Children.Add(Kit.Card(who, "Your account", null, signOut));
 
         var sync = new StackPanel();
@@ -207,7 +110,7 @@ public sealed class AccountPage : PageBase
         delAccount.Click += async (_, _) =>
         {
             if (!await Shell.ConfirmAsync("Delete your account?", $"Your account ({s.Email}) and everything saved to it are deleted for good. This can't be undone. Nothing on this PC changes.", "Delete my account", danger: true)) return;
-            await RunAsync(delAccount, async () => { await Svc.DeleteAccountAsync(); Shell.Toast("Your account was deleted.", ToastKind.Success); });
+            await RunAsync(delAccount, () => Svc.DeleteAccountAsync());   // VYTRIX then returns to its sign-in screen
         };
         danger.Children.Add(Kit.Row(delData, delAccount));
         var dangerCard = Kit.Card(danger, "Your data");
@@ -231,13 +134,6 @@ public sealed class AccountPage : PageBase
         }
         finally { b.IsEnabled = true; _busy = false; }
         await RenderAsync();
-    }
-
-    private Button Retry()
-    {
-        var b = new Button { Content = "Try again", Style = Ui.Style("Ghost") };
-        b.Click += async (_, _) => await RenderAsync();
-        return b;
     }
 
     private static TextBlock Para(string text)

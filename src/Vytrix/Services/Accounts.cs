@@ -209,6 +209,19 @@ public sealed class AccountService
         return fresh.AccessToken;
     }
 
+    /// <summary>
+    /// Checks a saved session with the account server. Returns false (and signs out) when the
+    /// server rejects it, e.g. the account was deleted or the session was revoked. Network
+    /// problems leave the session as it is, so VYTRIX still opens offline.
+    /// </summary>
+    public async Task<bool> VerifySessionAsync(CancellationToken ct = default)
+    {
+        if (_session is null) return false;
+        try { await AccessTokenAsync(ct); return true; }
+        catch (AccountException a) when (a.Status is HttpStatusCode.BadRequest or HttpStatusCode.Unauthorized) { return false; }
+        catch (Exception ex) { Log.Info("account", $"Couldn't check the saved session ({ex.GetType().Name}); keeping it."); return _session is not null; }
+    }
+
     // ───────────────────────── Sync
 
     /// <summary>Builds what gets synced: the tweaks that are on, the Custom profile's plan, and appearance settings.</summary>

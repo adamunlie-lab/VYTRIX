@@ -63,6 +63,35 @@ public class AccountTests
     }
 
     [Fact]
+    public async Task A_saved_session_the_server_rejects_is_signed_out_at_start()
+    {
+        using var fake = new AssistantTests.FakeClaude((200, Tokens()), (400, """{"error":"invalid_grant","error_description":"Invalid Refresh Token"}"""));
+        var (svc, store) = New(fake.Url);
+        await svc.SignInWithEmailAsync("gamer@example.com", "correct horse battery");
+        var restarted = new AccountService(fake.Url, AnonKey, store);   // saved session, no access token yet
+        bool changed = false;
+        restarted.Changed += () => changed = true;
+
+        Assert.False(await restarted.VerifySessionAsync());
+        Assert.False(restarted.SignedIn);
+        Assert.True(changed);                                            // the app listens for this to show the sign-in screen
+        Assert.False(store.Exists);
+    }
+
+    [Fact]
+    public async Task A_saved_session_is_kept_when_the_server_cannot_be_reached()
+    {
+        using var fake = new AssistantTests.FakeClaude((200, Tokens()));
+        var (svc, store) = New(fake.Url);
+        await svc.SignInWithEmailAsync("gamer@example.com", "correct horse battery");
+        var offline = new AccountService("http://127.0.0.1:9", AnonKey, store);   // nothing listens on port 9
+
+        Assert.True(await offline.VerifySessionAsync());
+        Assert.True(offline.SignedIn);
+        store.Delete();
+    }
+
+    [Fact]
     public async Task Upload_and_download_round_trip_with_row_level_security_headers()
     {
         var syncRow = new JsonArray(new JsonObject

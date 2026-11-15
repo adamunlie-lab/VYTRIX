@@ -104,11 +104,12 @@ public static class HelpContent
             new HelpPara("Switch modes any time under **AI settings** on the Assistant page. With Gemini or Claude, **Share PC details** decides whether your PC's details are sent with your questions.")),
 
         new("account", "Your account and sync", "IcoUser",
-            "Optional: keep your setup the same on every PC.",
-            "account", "Open Account", "account sign in login sync google microsoft github discord email password delete cloud",
+            "Sign in to use VYTRIX, and keep your setup the same on every PC.",
+            "account", "Open Account", "account sign in login sign out sync google microsoft github discord email password forgot reset delete cloud",
             new HelpSteps(
-                "Open **Account** and choose how to sign in: Google, Microsoft, GitHub, Discord or email (whichever are turned on).",
-                "On the PC that's set up the way you like, click **Save this PC's setup to my account**.",
+                "VYTRIX opens on its sign-in screen. Sign in, or click **Create an account**, enter your email and a password, and open the confirmation link we email you.",
+                "Forgot your password? Click **Forgot password?** on the sign-in screen and we'll email you a reset link. VYTRIX remembers your sign-in, so you only sign in again after signing out.",
+                "On the PC that's set up the way you like, open **Account** and click **Save this PC's setup to my account**.",
                 "On another PC, sign in and click **Load my synced setup**. Your look is applied straight away, and your tweaks go into the Custom profile for you to review and apply."),
             new HelpPara("An account stores your email, the setup you choose to save, and the name and picture your sign-in provider shares. Never your files, passwords, computer name or Assistant chats. You can delete your synced data or your whole account from the Account page.")),
 

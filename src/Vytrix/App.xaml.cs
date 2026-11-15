@@ -136,10 +136,39 @@ public partial class App : Application
         Journal.Prune();
         _ = SystemInfo.LoadWmiAsync();
 
+        // A VYTRIX account is required: the sign-in screen comes first unless a session is saved.
+        AccountService.Instance.Changed += () => Dispatcher.BeginInvoke(() =>
+        {
+            if (!AccountService.Instance.SignedIn && MainWindow is MainWindow) ShowSignIn();
+        });
+        if (AccountService.Instance.SignedIn) OpenMain();
+        else ShowSignIn();
+    }
+
+    private bool _telemetryStarted;
+
+    /// <summary>Shows the sign-in screen (at start, or after signing out) and closes the main window.</summary>
+    private void ShowSignIn()
+    {
+        Log.Info("account", "Showing the sign-in screen.");
+        var old = MainWindow;
+        var w = new SignInWindow();
+        w.SignedIn += () => OpenMain();
+        MainWindow = w;
+        w.Show();
+        if (old is not null && old != w) old.Close();
+    }
+
+    /// <summary>Opens the main window once signed in, and checks the saved session in the background.</summary>
+    private void OpenMain()
+    {
+        var old = MainWindow;
         var win = new MainWindow();
         MainWindow = win;
         win.Show();
-        Telemetry.Instance.Start(Dispatcher);
+        if (old is not null && old != win) old.Close();
+        if (!_telemetryStarted) { _telemetryStarted = true; Telemetry.Instance.Start(Dispatcher); }
+        _ = AccountService.Instance.VerifySessionAsync();   // a rejected session signs out, which returns to the sign-in screen
     }
 
     private void OnUiException(object sender, DispatcherUnhandledExceptionEventArgs e)

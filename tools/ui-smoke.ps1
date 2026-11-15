@@ -40,13 +40,13 @@ function WaitWin { $w = $null; for ($i = 0; $i -lt 40 -and -not $w; $i++) { Star
 $fresh = New-QaDataDir
 $p = Launch
 $w = WaitWin
-Check 'First run shows Terms of Agreement' ($null -ne (FindByName $w 'VYTRIX Terms of Agreement (v1.4)'))
+Check 'First run shows Terms of Agreement' ($null -ne (FindByName $w 'VYTRIX Terms of Agreement (v1.5)'))
 $accept = FindButtonContaining $w 'Accept'
 Check 'Accept disabled until box is ticked' ($accept -and -not $accept.Current.IsEnabled)
 Shot 'terms-first-run'
 Invoke (FindButtonContaining $w 'Decline')
 Check 'Decline exits the app' ($p.WaitForExit(5000))
-Check 'Declining does not record acceptance' (-not ((Get-Content (Join-Path $fresh 'settings.json') -ErrorAction SilentlyContinue) -match '"acceptedTermsVersion": "1.4"'))
+Check 'Declining does not record acceptance' (-not ((Get-Content (Join-Path $fresh 'settings.json') -ErrorAction SilentlyContinue) -match '"acceptedTermsVersion": "1.5"'))
 $p = Launch
 $w = WaitWin
 $box = FindByName $w 'I have read and agree to the VYTRIX Terms of Agreement'
@@ -56,13 +56,32 @@ $accept = FindButtonContaining $w 'Accept'
 Check 'Ticking the box enables Accept' ($accept.Current.IsEnabled)
 Invoke $accept
 Start-Sleep -Milliseconds 800
-Check 'Accepting records version 1.4' ((Get-Content (Join-Path $fresh 'settings.json') -Raw) -match '"acceptedTermsVersion": "1.4"')
+Check 'Accepting records version 1.5' ((Get-Content (Join-Path $fresh 'settings.json') -Raw) -match '"acceptedTermsVersion": "1.5"')
 Check 'App stays open after accepting' (-not $p.HasExited)
 $p.CloseMainWindow() | Out-Null; $p.WaitForExit(5000) | Out-Null
 $p = Launch
 $w = WaitWin
-Check 'Terms not shown again once accepted' ($null -eq (FindByName $w 'VYTRIX Terms of Agreement (v1.4)'))
+Check 'Terms not shown again once accepted' ($null -eq (FindByName $w 'VYTRIX Terms of Agreement (v1.5)'))
 $p.CloseMainWindow() | Out-Null; $p.WaitForExit(5000) | Out-Null
+
+# 0b. Sign-in screen: with no saved session VYTRIX opens its separate sign-in window, not the main one.
+function SignInWin {
+    $c = New-Object Windows.Automation.AndCondition(
+        (New-Object Windows.Automation.PropertyCondition([Windows.Automation.AutomationElement]::NameProperty, 'Sign in - VYTRIX')),
+        (New-Object Windows.Automation.PropertyCondition([Windows.Automation.AutomationElement]::ProcessIdProperty, [int]$script:qaPid)))
+    [Windows.Automation.AutomationElement]::RootElement.FindFirst('Children', $c)
+}
+New-QaDataDir -TermsAccepted -SignedOut | Out-Null
+$env:VYTRIX_ACCOUNTS_URL = 'http://127.0.0.1:9'   # unreachable: the screen must say so rather than hang
+$p = Launch
+$s = $null; for ($i = 0; $i -lt 40 -and -not $s; $i++) { Start-Sleep -Milliseconds 250; $s = SignInWin }
+Start-Sleep -Seconds 3
+Check 'Without a sign-in VYTRIX opens its sign-in window' ($null -ne $s)
+Check 'Main window stays closed until signed in' ($null -eq (Win))
+Check 'Unreachable account server offers Try again' ($s -and $null -ne (FindButtonContaining $s 'Try again'))
+Shot 'sign-in-offline'
+$p.CloseMainWindow() | Out-Null
+Check 'Closing the sign-in window exits VYTRIX' ($p.WaitForExit(5000))
 
 # Remaining checks run against an isolated folder with the terms pre-accepted.
 New-QaDataDir -TermsAccepted | Out-Null
