@@ -110,7 +110,15 @@ create a warranty (see section 8).
       you choose to install. Your questions and your PC's details stay on
       your computer. Setting it up downloads Ollama and the model you
       pick (several gigabytes) from Ollama's servers.
-  (f) AI assistant, Claude mode (optional): only if you enter your own
+  (f) AI assistant, Gemini mode (optional): only if you enter your own
+      free Google AI Studio API key, your messages are sent to Google to
+      generate answers, under your own agreement with Google. On Google's
+      free tier, Google may use what you send to improve its products and
+      applies daily usage limits. If "Share PC details" is on (you can
+      turn it off at any time), it may also send the same PC details
+      listed for Claude mode below. Your key is stored on this computer,
+      encrypted for your Windows account, and only sent to Google.
+  (g) AI assistant, Claude mode (optional): only if you enter your own
       Anthropic API key, your messages are sent to Anthropic, PBC to
       generate answers, under your own agreement with Anthropic, and
       usage is billed to your Anthropic account. If "Share PC details"
@@ -121,10 +129,10 @@ create a warranty (see section 8).
       name, your Windows user name or your API key to anyone but
       Anthropic. Your key is stored on this computer, encrypted for your
       Windows account, and you can remove it at any time.
-  (g) In either mode, AI answers can be wrong. The Assistant can only
+  (h) In every mode, AI answers can be wrong. The Assistant can only
       suggest changes, and each one still needs your click and
       confirmation.
-  (h) System reports you export may contain hardware details, installed
+  (i) System reports you export may contain hardware details, installed
       application names and your computer name. Review a report before
       sharing it with anyone.
 
@@ -136,11 +144,12 @@ winsat and System Restore) and, where present, the NVIDIA Management
 Library (NVML) installed with NVIDIA graphics drivers. These components
 are provided by their respective owners under their own terms. The
 Assistant's free mode uses Ollama and openly licensed AI models (such as
-Qwen), each under its own license. Its optional Claude mode uses Claude,
-provided by Anthropic, PBC under Anthropic's own terms and usage
-policies. VYTRIX is
+Qwen), each under its own license. Its optional Gemini mode uses Gemini,
+provided by Google under Google's own terms, and its optional Claude
+mode uses Claude, provided by Anthropic, PBC under Anthropic's own terms
+and usage policies. VYTRIX is
 not affiliated with, endorsed by or sponsored by Microsoft, NVIDIA, AMD,
-Intel, Anthropic or any other hardware or software vendor. All trademarks belong to
+Intel, Google, Anthropic, Ollama or any other hardware or software vendor. All trademarks belong to
 their respective owners.
 
 

@@ -17,38 +17,61 @@ public sealed record AssistantAction(string Kind, string Target, string Label, s
 /// <summary>One finished assistant reply: its text and any actions it suggested.</summary>
 public sealed record AssistantReply(string Text, IReadOnlyList<AssistantAction> Actions);
 
-/// <summary>The user's Anthropic API key, encrypted with Windows DPAPI for this Windows account only.</summary>
-public static class AssistantKey
+/// <summary>An API key stored in a file, encrypted with Windows DPAPI for this Windows account only.</summary>
+public sealed class StoredKey(string fileName, string label)
 {
-    private static string FilePath => Path.Combine(AppPaths.Root, "assistant-key.bin");
+    private string FilePath => Path.Combine(AppPaths.Root, fileName);
     private static readonly byte[] Entropy = Encoding.UTF8.GetBytes("VYTRIX assistant key v1");
 
-    public static bool Exists => File.Exists(FilePath);
+    public bool Exists => File.Exists(FilePath);
 
-    public static string? Load()
+    public string? Load()
     {
         try
         {
             if (!File.Exists(FilePath)) return null;
             return Encoding.UTF8.GetString(ProtectedData.Unprotect(File.ReadAllBytes(FilePath), Entropy, DataProtectionScope.CurrentUser));
         }
-        catch (Exception ex) { Log.Warn("assistant", $"Stored key could not be read: {ex.GetType().Name}"); return null; }
+        catch (Exception ex) { Log.Warn("assistant", $"Stored {label} key could not be read: {ex.GetType().Name}"); return null; }
     }
 
-    public static void Save(string key)
+    public void Save(string key)
     {
         File.WriteAllBytes(FilePath, ProtectedData.Protect(Encoding.UTF8.GetBytes(key.Trim()), Entropy, DataProtectionScope.CurrentUser));
-        Log.Info("assistant", "API key saved (encrypted for this Windows account).");
+        Log.Info("assistant", $"{label} key saved (encrypted for this Windows account).");
     }
 
-    public static void Delete()
+    public void Delete()
     {
         try { if (File.Exists(FilePath)) File.Delete(FilePath); } catch { }
-        Log.Info("assistant", "API key removed.");
+        Log.Info("assistant", $"{label} key removed.");
     }
+}
+
+/// <summary>The user's Anthropic API key.</summary>
+public static class AssistantKey
+{
+    private static readonly StoredKey Store = new("assistant-key.bin", "Anthropic API");
+    public static bool Exists => Store.Exists;
+    public static string? Load() => Store.Load();
+    public static void Save(string key) => Store.Save(key);
+    public static void Delete() => Store.Delete();
 
     /// <summary>Anthropic API keys start with sk-ant-. This only catches obvious paste mistakes.</summary>
     public static bool LooksValid(string? key) => key is not null && key.Trim().StartsWith("sk-ant-", StringComparison.Ordinal) && key.Trim().Length > 30 && !key.Trim().Contains(' ');
+}
+
+/// <summary>The user's free Google AI Studio (Gemini) API key.</summary>
+public static class GeminiKey
+{
+    private static readonly StoredKey Store = new("gemini-key.bin", "Gemini API");
+    public static bool Exists => Store.Exists;
+    public static string? Load() => Store.Load();
+    public static void Save(string key) => Store.Save(key);
+    public static void Delete() => Store.Delete();
+
+    /// <summary>Google API keys are about 39 characters with no spaces. This only catches obvious paste mistakes.</summary>
+    public static bool LooksValid(string? key) => key is not null && key.Trim().Length is >= 30 and <= 200 && !key.Trim().Any(char.IsWhiteSpace) && !key.Trim().StartsWith("sk-ant-", StringComparison.Ordinal);
 }
 
 /// <summary>

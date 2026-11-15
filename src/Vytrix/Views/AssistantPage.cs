@@ -33,6 +33,7 @@ public sealed class AssistantPage : PageBase
     private readonly Button _send = new() { Content = "Send", Margin = new Thickness(10, 0, 0, 0), MinWidth = 86 };
     private readonly TextBlock _status = new() { FontSize = 12, Margin = new Thickness(36, 0, 32, 6), Visibility = Visibility.Collapsed };
     private AssistantSession? _claude;
+    private GeminiAssistant? _gemini;
     private LocalAssistant? _local;
     private bool _showSetup;
     private CancellationTokenSource? _cts;
@@ -40,6 +41,11 @@ public sealed class AssistantPage : PageBase
     private int _renderGen;
 
     private static bool UseClaude => Settings.Current.AssistantMode == "claude";
+    private static bool UseGemini => Settings.Current.AssistantMode == "gemini";
+    private static bool UseLocal => !UseClaude && !UseGemini;
+    private bool HasEngine => _claude is not null || _gemini is not null || _local is not null;
+    private int ActiveTurns => UseClaude ? _claude?.TurnCount ?? 0 : UseGemini ? _gemini?.TurnCount ?? 0 : _local?.TurnCount ?? 0;
+    private void ResetAll() { _claude?.Reset(); _gemini?.Reset(); _local?.Reset(); }
     private static LocalModel CurrentModel => Ollama.Models.FirstOrDefault(m => m.Id == Settings.Current.AssistantLocalModel) ?? Ollama.Models[0];
 
     protected override void Build()
@@ -58,7 +64,7 @@ public sealed class AssistantPage : PageBase
 
     public override void OnShown()
     {
-        if (!_busy && (_claude is not null || _local is not null) && !_showSetup) _input.Focus();
+        if (!_busy && HasEngine && !_showSetup) _input.Focus();
     }
 
     private void Clear()
@@ -80,7 +86,13 @@ public sealed class AssistantPage : PageBase
                 BuildChat();
                 return;
             }
-            if (!UseClaude)
+            if (UseGemini && GeminiKey.Load() is { } gkey)
+            {
+                _gemini ??= new GeminiAssistant(gkey);
+                BuildChat();
+                return;
+            }
+            if (UseLocal)
             {
                 _host.Children.Add(new TextBlock { Text = "Starting the local AI…", Style = Ui.Style("Muted"), Margin = new Thickness(32, 12, 32, 0) });
                 bool ready = await Ollama.EnsureRunningAsync() && await Ollama.HasModelAsync(CurrentModel.Id);
@@ -110,9 +122,15 @@ public sealed class AssistantPage : PageBase
 
         var free = new StackPanel();
         BuildLocalSetup(free);
-        var freeCard = Kit.Card(free, "Free AI on your PC", "Private and offline. Nothing you ask ever leaves this computer.", Ui.Badge("Recommended", "GoodBrush", "GoodSoftBrush"));
+        var freeCard = Kit.Card(free, "Free AI on your PC", "Private and offline. Nothing you ask ever leaves this computer.", Ui.Badge("Most private", "GoodBrush", "GoodSoftBrush"));
         freeCard.Margin = new Thickness(0, 14, 0, 0);
         body.Children.Add(freeCard);
+
+        var gemini = new StackPanel();
+        BuildGeminiSetup(gemini);
+        var geminiCard = Kit.Card(gemini, "Free online: Gemini", "Google's Gemini with your own free API key. Nothing to install, and quicker answers than local AI.");
+        geminiCard.Margin = new Thickness(0, 14, 0, 0);
+        body.Children.Add(geminiCard);
 
         var claude = new StackPanel();
         BuildClaudeSetup(claude);
@@ -120,7 +138,7 @@ public sealed class AssistantPage : PageBase
         claudeCard.Margin = new Thickness(0, 14, 0, 0);
         body.Children.Add(claudeCard);
 
-        if (_claude is not null || _local is not null)
+        if (HasEngine)
         {
             var back = new Button { Content = "Back to chat", Style = Ui.Style("Ghost"), HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(0, 14, 0, 0) };
             back.Click += async (_, _) => { _showSetup = false; await RenderAsync(); };
@@ -251,6 +269,70 @@ public sealed class AssistantPage : PageBase
         _ = Refresh();
     }
 
+    private void BuildGeminiSetup(StackPanel sp)
+    {
+        sp.Children.Add(Para("Create a free API key in **Google AI Studio** and paste it here. The free tier has daily limits, and **Google may use what you send to improve its products**, including your PC details if Share PC details is on. The key is stored on this PC, encrypted for your Windows account, and only ever sent to Google."));
+        if (GeminiKey.Exists)
+        {
+            var use = new Button { Content = "Use Gemini", Style = Ui.Style("Primary") };
+            use.Click += async (_, _) => { Settings.Current.AssistantMode = "gemini"; Settings.Save(); _showSetup = false; await RenderAsync(); };
+            var remove = new Button { Content = "Remove key", Style = Ui.Style("Ghost"), Margin = new Thickness(8, 0, 0, 0) };
+            remove.Click += async (_, _) =>
+            {
+                if (!await Shell.ConfirmAsync("Remove your Gemini key?", "VYTRIX will delete the key stored on this PC. The key keeps working in your Google account until you delete it in Google AI Studio.", "Remove key", danger: true)) return;
+                GeminiKey.Delete();
+                _gemini = null;
+                if (UseGemini) { Settings.Current.AssistantMode = "local"; Settings.Save(); }
+                await RenderAsync();
+            };
+            sp.Children.Add(new TextBlock { Text = "✓  A Gemini key is saved on this PC.", Foreground = Ui.Res("GoodBrush"), FontSize = 13, Margin = new Thickness(0, 0, 0, 10) });
+            sp.Children.Add(Kit.Row(use, remove));
+            return;
+        }
+        var studio = Ui.IconButton("IcoExport", "Get a free key in Google AI Studio", "Ghost");
+        studio.HorizontalAlignment = HorizontalAlignment.Left;
+        studio.Margin = new Thickness(0, 0, 0, 12);
+        studio.Click += (_, _) => SysCmd.Open(GeminiAssistant.KeyPage);
+        sp.Children.Add(studio);
+        sp.Children.Add(KeyEntry("Your Gemini API key from Google AI Studio", "Save key and use Gemini", GeminiKey.LooksValid,
+            "That doesn't look like a Google AI Studio key. Copy the whole key, with no spaces.",
+            async k =>
+            {
+                GeminiKey.Save(k);
+                _gemini = null;
+                Settings.Current.AssistantMode = "gemini";
+                Settings.Save();
+                _showSetup = false;
+                await RenderAsync();
+                Shell.Toast("Gemini is ready. Ask it anything about your PC.", ToastKind.Success);
+            }));
+    }
+
+    /// <summary>A password box with a save button and inline validation.</summary>
+    private static StackPanel KeyEntry(string tooltip, string buttonText, Func<string, bool> valid, string invalidText, Func<string, Task> onSave)
+    {
+        var sp = new StackPanel();
+        var pw = new PasswordBox { Height = 38, Padding = new Thickness(10, 8, 10, 8), FontSize = 13, ToolTip = tooltip };
+        var save = new Button { Content = buttonText, Style = Ui.Style("Ghost"), Margin = new Thickness(10, 0, 0, 0) };
+        var row = new Grid();
+        row.ColumnDefinitions.Add(new ColumnDefinition());
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        row.Children.Add(pw);
+        Grid.SetColumn(save, 1);
+        row.Children.Add(save);
+        sp.Children.Add(row);
+        var err = new TextBlock { Foreground = Ui.Res("BadBrush"), FontSize = 12, Margin = new Thickness(0, 8, 0, 0), Visibility = Visibility.Collapsed, TextWrapping = TextWrapping.Wrap };
+        sp.Children.Add(err);
+        save.Click += async (_, _) =>
+        {
+            var k = pw.Password.Trim();
+            if (!valid(k)) { err.Text = invalidText; err.Visibility = Visibility.Visible; return; }
+            try { pw.Clear(); await onSave(k); }
+            catch (Exception ex) { err.Text = "Couldn't save the key: " + ex.Message; err.Visibility = Visibility.Visible; }
+        };
+        return sp;
+    }
+
     private void BuildClaudeSetup(StackPanel sp)
     {
         sp.Children.Add(Para("Create an API key in the Anthropic Console and paste it here. Usage is billed to your Anthropic account. The key is stored on this PC, encrypted for your Windows account, and only ever sent to Anthropic."));
@@ -310,15 +392,18 @@ public sealed class AssistantPage : PageBase
 
     private void BuildChat()
     {
-        var chip = UseClaude
-            ? Ui.Badge("Claude  ·  your key", "AccentHoverBrush", "AccentSoftBrush")
+        var chip = UseClaude ? Ui.Badge("Claude  ·  your key", "AccentHoverBrush", "AccentSoftBrush")
+            : UseGemini ? Ui.Badge("Gemini  ·  free tier", "AccentHoverBrush", "AccentSoftBrush")
             : Ui.Badge($"Free  ·  on this PC  ·  {CurrentModel.Name}", "GoodBrush", "GoodSoftBrush");
         chip.VerticalAlignment = VerticalAlignment.Center;
-        chip.ToolTip = UseClaude ? "Answers come from Claude, billed to your Anthropic key." : "Answers come from an AI model running on this PC. Nothing leaves your computer.";
+        chip.ToolTip = UseClaude ? "Answers come from Claude, billed to your Anthropic key."
+            : UseGemini ? "Answers come from Google's Gemini on your free key. Google may use what you send to improve its products."
+            : "Answers come from an AI model running on this PC. Nothing leaves your computer.";
         var items = new List<UIElement> { chip };
-        if (UseClaude)
+        if (!UseLocal)
         {
-            var share = Kit.Switch(Settings.Current.AssistantSharePcDetails, "Let Claude read your PC's readings, tweak states, top apps and VYTRIX change history.");
+            var who = UseClaude ? "Claude" : "Gemini";
+            var share = Kit.Switch(Settings.Current.AssistantSharePcDetails, $"Let {who} read your PC's readings, tweak states, top apps and VYTRIX change history.");
             share.Margin = new Thickness(16, 0, 0, 0);
             share.Checked += (_, _) => SetShare(true);
             share.Unchecked += (_, _) => SetShare(false);
@@ -327,11 +412,11 @@ public sealed class AssistantPage : PageBase
         }
         var newChat = Ui.IconButton("IcoRefresh", "New chat", "Ghost");
         newChat.Margin = new Thickness(16, 0, 0, 0);
-        newChat.Click += (_, _) => { if (_busy) return; _claude?.Reset(); _local?.Reset(); ShowWelcome(); };
+        newChat.Click += (_, _) => { if (_busy) return; ResetAll(); ShowWelcome(); };
         items.Add(newChat);
         var settings = Ui.IconButton("IcoSettings", "AI settings", "Ghost");
         settings.Margin = new Thickness(8, 0, 0, 0);
-        settings.ToolTip = "Switch between free local AI and Claude, or change the model";
+        settings.ToolTip = "Switch between free local AI, Gemini and Claude, or change the model";
         settings.Click += async (_, _) => { if (_busy) return; _showSetup = true; await RenderAsync(); };
         items.Add(settings);
         var row = new StackPanel { Orientation = Orientation.Horizontal };
@@ -359,14 +444,15 @@ public sealed class AssistantPage : PageBase
         Grid.SetRow(bar, 2);
         _host.Children.Add(bar);
 
-        if (_chat.Children.Count == 0 || (UseClaude ? _claude!.TurnCount : _local!.TurnCount) == 0) ShowWelcome();
+        if (_chat.Children.Count == 0 || ActiveTurns == 0) ShowWelcome();
     }
 
     private void SetShare(bool on)
     {
         Settings.Current.AssistantSharePcDetails = on;
         Settings.Save();
-        Shell.Toast(on ? "Claude can now read your PC's details." : "PC details won't be shared with Claude. Answers will be more general.", ToastKind.Info);
+        var who = UseClaude ? "Claude" : "Gemini";
+        Shell.Toast(on ? $"{who} can now read your PC's details." : $"PC details won't be shared with {who}. Answers will be more general.", ToastKind.Info);
     }
 
     private void ShowWelcome()
@@ -378,7 +464,7 @@ public sealed class AssistantPage : PageBase
         hero.Children.Add(new TextBlock { Text = "How can I help your PC today?", Style = Ui.Style("H2"), FontSize = 20, HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 14, 0, 6) });
         hero.Children.Add(new TextBlock
         {
-            Text = UseClaude
+            Text = !UseLocal
                 ? "I can check your PC, explain any setting, and suggest changes as buttons. Nothing changes unless you click."
                 : "I run right here on your PC, for free. I can check your PC, explain any setting, and suggest changes as buttons. Nothing changes unless you click.",
             Style = Ui.Style("Muted"), TextAlignment = TextAlignment.Center, TextWrapping = TextWrapping.Wrap,
@@ -400,27 +486,28 @@ public sealed class AssistantPage : PageBase
     {
         if (_busy) { _cts?.Cancel(); return; }
         var text = _input.Text.Trim();
-        bool claude = UseClaude;
-        if (text.Length == 0 || (claude ? _claude is null : _local is null)) return;
-        if ((claude ? _claude!.TurnCount : _local!.TurnCount) == 0) _chat.Children.Clear();
+        bool claude = UseClaude, gemini = UseGemini;
+        if (text.Length == 0 || (claude ? _claude is null : gemini ? _gemini is null : _local is null)) return;
+        if (ActiveTurns == 0) _chat.Children.Clear();
         _input.Clear();
         AddUser(text);
-        SetBusy(true, claude ? "Thinking…" : "Thinking… (the first answer can take a little longer while the model loads)");
+        SetBusy(true, claude || gemini ? "Thinking…" : "Thinking… (the first answer can take a little longer while the model loads)");
         _cts = new CancellationTokenSource();
         var ct = _cts.Token;
         try
         {
             var progress = new Progress<string>(s => _status.Text = s);
-            var reply = claude
-                ? await Task.Run(() => _claude!.SendAsync(text, Settings.Current.AssistantSharePcDetails, progress, ct))
+            bool share = Settings.Current.AssistantSharePcDetails;
+            var reply = claude ? await Task.Run(() => _claude!.SendAsync(text, share, progress, ct))
+                : gemini ? await Task.Run(() => _gemini!.SendAsync(text, share, progress, ct))
                 : await Task.Run(() => _local!.SendAsync(text, progress, ct));
             AddAssistant(reply);
         }
         catch (Exception ex)
         {
             Log.Warn("assistant", $"Request failed: {ex.GetType().Name}");
-            AddError(claude ? AssistantSession.Describe(ex) : LocalAssistant.Describe(ex));
-            if (ex is not OperationCanceledException) { _claude?.Reset(); _local?.Reset(); }   // a failed turn can leave half a tool exchange behind
+            AddError(claude ? AssistantSession.Describe(ex) : gemini ? GeminiAssistant.Describe(ex) : LocalAssistant.Describe(ex));
+            if (ex is not OperationCanceledException) ResetAll();   // a failed turn can leave half a tool exchange behind
         }
         finally
         {

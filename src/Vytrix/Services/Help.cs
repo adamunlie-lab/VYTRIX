@@ -90,14 +90,18 @@ public static class HelpContent
 
         new("assistant", "The AI Assistant", "IcoSparkle",
             "Free AI that runs on your PC; it suggests, you decide.",
-            "assistant", "Open Assistant", "ai assistant free local ollama offline model claude chat anthropic api key share privacy",
+            "assistant", "Open Assistant", "ai assistant free local ollama offline model gemini google claude chat anthropic api key share privacy",
             new HelpSteps(
                 "Open **Assistant** in the sidebar and click **Install Ollama (free)**. Ollama is the free app that runs the AI on your PC.",
                 "Pick a model and click **Download model**: **Standard** (about 2.5 GB) for most PCs, or **Best quality** (about 5.2 GB) for PCs with a strong GPU.",
                 "Click **Start chatting** and ask anything, like \"Why does my PC feel slow?\""),
             new HelpPara("The free mode is private: your questions and PC details never leave your computer, and it works offline once set up. The first answer can take a few seconds while the model loads."),
             new HelpPara("The Assistant can look at your PC and suggest changes as buttons, but it **can't change anything by itself**. Tweaks still ask you to confirm, and everything stays undoable."),
-            new HelpPara("Want sharper answers? Under **AI settings** you can switch to **Claude** with your own Anthropic API key. That's optional and paid per use, and your questions then go to Anthropic.")),
+            new HelpTable("Mode", "What to know",
+                ("Free AI on your PC", "Free, private and offline. Needs Ollama and a one-time model download."),
+                ("Gemini", "Free online with your own Google AI Studio key. Quicker answers, daily limits, and Google may use what you send to improve its products."),
+                ("Claude", "Sharpest answers with your own Anthropic key. Paid per use.")),
+            new HelpPara("Switch modes any time under **AI settings** on the Assistant page. With Gemini or Claude, **Share PC details** decides whether your PC's details are sent with your questions.")),
 
         new("restore", "Undo anything", "IcoRestore",
             "Everything VYTRIX changes is recorded first, so you can always go back.",
@@ -135,7 +139,7 @@ public static class HelpContent
                 ("Something feels wrong", "Roll the change back in the Restore Center, or use **Roll back everything**."),
                 ("Windows warned me about the installer", "VYTRIX isn't code-signed yet. Choose **More info**, then **Run anyway**."),
                 ("DNS changed but IPv6 didn't", "DNS presets apply to IPv4 only. IPv6 DNS is left unchanged."),
-                ("Does VYTRIX collect my data?", "No. VYTRIX has no analytics. It contacts GitHub to check for updates, and the Network tests ping public servers. The free Assistant runs entirely on your PC. Only if you switch it to Claude do your messages go to Anthropic."),
+                ("Does VYTRIX collect my data?", "No. VYTRIX has no analytics. It contacts GitHub to check for updates, and the Network tests ping public servers. The free local Assistant runs entirely on your PC. If you switch it to Gemini or Claude, your messages go to Google or Anthropic."),
                 ("Where are my reports?", "In **Documents**, in the **VYTRIX Reports** folder."),
                 ("How do I uninstall?", "Optionally **Roll back everything** first, then uninstall VYTRIX from Windows Settings, Apps."))),
     ];
