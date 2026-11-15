@@ -89,7 +89,7 @@ public sealed class AssistantSession
         ["overview"] = "Overview", ["optimization"] = "Optimization", ["gaming"] = "Gaming", ["network"] = "Network",
         ["memory"] = "Memory", ["storage"] = "Storage", ["tweaks"] = "Tweaks", ["startup"] = "Startup",
         ["restore"] = "Restore Center", ["hardware"] = "Hardware", ["apps"] = "Installed Apps", ["services"] = "Services",
-        ["benchmark"] = "Benchmark", ["settings"] = "Settings", ["help"] = "Help",
+        ["benchmark"] = "Benchmark", ["settings"] = "Settings", ["account"] = "Account", ["help"] = "Help",
     };
 
     private readonly List<BetaMessageParam> _messages = [];

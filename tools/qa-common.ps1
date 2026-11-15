@@ -19,7 +19,7 @@ function New-QaDataDir([switch]$TermsAccepted, [string]$Theme = '') {
         # Update checks off: QA must not contact GitHub or show update prompts (the update test enables them itself).
         # The one-time theme introductions are marked done, so the requested theme isn't replaced at startup.
         $themeJson = if ($Theme) { ", `"theme`": `"$Theme`", `"seasonalThemes`": false, `"christmasIntroduced`": true, `"cherryBlossomIntroduced`": true" } else { '' }
-        ('{ "acceptedTermsVersion": "1.3", "acceptedTermsAt": "2026-01-01T00:00:00", "checkUpdatesOnStart": false, "gitHubFeedIntroduced": true' + $themeJson + ' }') | Set-Content (Join-Path $dir 'settings.json') -Encoding ascii
+        ('{ "acceptedTermsVersion": "1.4", "acceptedTermsAt": "2026-01-01T00:00:00", "checkUpdatesOnStart": false, "gitHubFeedIntroduced": true' + $themeJson + ' }') | Set-Content (Join-Path $dir 'settings.json') -Encoding ascii
     }
     $env:VYTRIX_DATA_DIR = $dir
     # QA copies must never launch the user's Ollama: one started from a restricted test shell

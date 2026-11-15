@@ -103,6 +103,15 @@ public static class HelpContent
                 ("Claude", "Sharpest answers with your own Anthropic key. Paid per use.")),
             new HelpPara("Switch modes any time under **AI settings** on the Assistant page. With Gemini or Claude, **Share PC details** decides whether your PC's details are sent with your questions.")),
 
+        new("account", "Your account and sync", "IcoUser",
+            "Optional: keep your setup the same on every PC.",
+            "account", "Open Account", "account sign in login sync google microsoft github discord email password delete cloud",
+            new HelpSteps(
+                "Open **Account** and choose how to sign in: Google, Microsoft, GitHub, Discord or email (whichever are turned on).",
+                "On the PC that's set up the way you like, click **Save this PC's setup to my account**.",
+                "On another PC, sign in and click **Load my synced setup**. Your look is applied straight away, and your tweaks go into the Custom profile for you to review and apply."),
+            new HelpPara("An account stores your email, the setup you choose to save, and the name and picture your sign-in provider shares. Never your files, passwords, computer name or Assistant chats. You can delete your synced data or your whole account from the Account page.")),
+
         new("restore", "Undo anything", "IcoRestore",
             "Everything VYTRIX changes is recorded first, so you can always go back.",
             "restore", "Open Restore Center", "undo rollback roll back restore point backup journal log uninstall",

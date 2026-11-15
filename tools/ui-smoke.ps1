@@ -40,13 +40,13 @@ function WaitWin { $w = $null; for ($i = 0; $i -lt 40 -and -not $w; $i++) { Star
 $fresh = New-QaDataDir
 $p = Launch
 $w = WaitWin
-Check 'First run shows Terms of Agreement' ($null -ne (FindByName $w 'VYTRIX Terms of Agreement (v1.3)'))
+Check 'First run shows Terms of Agreement' ($null -ne (FindByName $w 'VYTRIX Terms of Agreement (v1.4)'))
 $accept = FindButtonContaining $w 'Accept'
 Check 'Accept disabled until box is ticked' ($accept -and -not $accept.Current.IsEnabled)
 Shot 'terms-first-run'
 Invoke (FindButtonContaining $w 'Decline')
 Check 'Decline exits the app' ($p.WaitForExit(5000))
-Check 'Declining does not record acceptance' (-not ((Get-Content (Join-Path $fresh 'settings.json') -ErrorAction SilentlyContinue) -match '"acceptedTermsVersion": "1.3"'))
+Check 'Declining does not record acceptance' (-not ((Get-Content (Join-Path $fresh 'settings.json') -ErrorAction SilentlyContinue) -match '"acceptedTermsVersion": "1.4"'))
 $p = Launch
 $w = WaitWin
 $box = FindByName $w 'I have read and agree to the VYTRIX Terms of Agreement'
@@ -56,12 +56,12 @@ $accept = FindButtonContaining $w 'Accept'
 Check 'Ticking the box enables Accept' ($accept.Current.IsEnabled)
 Invoke $accept
 Start-Sleep -Milliseconds 800
-Check 'Accepting records version 1.3' ((Get-Content (Join-Path $fresh 'settings.json') -Raw) -match '"acceptedTermsVersion": "1.3"')
+Check 'Accepting records version 1.4' ((Get-Content (Join-Path $fresh 'settings.json') -Raw) -match '"acceptedTermsVersion": "1.4"')
 Check 'App stays open after accepting' (-not $p.HasExited)
 $p.CloseMainWindow() | Out-Null; $p.WaitForExit(5000) | Out-Null
 $p = Launch
 $w = WaitWin
-Check 'Terms not shown again once accepted' ($null -eq (FindByName $w 'VYTRIX Terms of Agreement (v1.3)'))
+Check 'Terms not shown again once accepted' ($null -eq (FindByName $w 'VYTRIX Terms of Agreement (v1.4)'))
 $p.CloseMainWindow() | Out-Null; $p.WaitForExit(5000) | Out-Null
 
 # Remaining checks run against an isolated folder with the terms pre-accepted.
@@ -88,7 +88,7 @@ if ($clean) {
 }
 
 # 3. Navigation through every sidebar item
-foreach ($n in 'Overview','Assistant','Optimization','Gaming','Network','Memory','Storage','Tweaks','Startup','Restore Center','Hardware','Installed Apps','Services','Benchmark','Settings','Help') {
+foreach ($n in 'Overview','Assistant','Optimization','Gaming','Network','Memory','Storage','Tweaks','Startup','Restore Center','Hardware','Installed Apps','Services','Benchmark','Settings','Account','Help') {
     $item = FindByName (Win) $n
     if ($item) { $item.GetCurrentPattern([Windows.Automation.SelectionItemPattern]::Pattern).Select(); Start-Sleep -Milliseconds 900 }
     $title = FindByName (Win) $(if ($n -eq 'Tweaks') { 'Tweak Library' } else { $n })

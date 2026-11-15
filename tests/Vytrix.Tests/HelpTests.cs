@@ -7,7 +7,7 @@ public class HelpTests
 {
     // Keep in sync with the sidebar in MainWindow.xaml.cs.
     private static readonly HashSet<string> PageKeys =
-        ["overview", "assistant", "optimization", "gaming", "network", "memory", "storage", "tweaks", "startup", "restore", "hardware", "apps", "services", "benchmark", "settings", "help"];
+        ["overview", "assistant", "optimization", "gaming", "network", "memory", "storage", "tweaks", "startup", "restore", "hardware", "apps", "services", "benchmark", "settings", "account", "help"];
 
     private static IEnumerable<string> AllText() =>
         HelpContent.Topics.SelectMany(t => t.Blocks.SelectMany(b => b switch

@@ -48,7 +48,12 @@ public static class TweakSetup
         catch (JsonException) { throw new InvalidDataException("That file isn't a VYTRIX tweak setup."); }
         if (file is null || file.Format != TweakSetupFile.FormatName) throw new InvalidDataException("That file isn't a VYTRIX tweak setup.");
         if (file.Version > 1) throw new InvalidDataException("That setup was made by a newer VYTRIX. Update VYTRIX, then try again.");
+        return FromFile(file);
+    }
 
+    /// <summary>Sorts a setup's tweaks into usable here, unknown to this version, and unsupported on this PC.</summary>
+    public static TweakSetupImport FromFile(TweakSetupFile file)
+    {
         var usable = new List<Tweak>();
         var unknown = new List<string>();
         var unsupported = new List<Tweak>();

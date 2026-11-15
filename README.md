@@ -59,7 +59,7 @@ src/Vytrix/
                             ThemeManager, UI kit
   Views/                    one class per page
   Themes/Theme.xaml         palette, typography, custom icon set, control styles
-tests/Vytrix.Tests/         xUnit tests (169, incl. 13 admin)
+tests/Vytrix.Tests/         xUnit tests (182, incl. 13 admin)
 legal/TERMS.txt             Terms of Agreement (embedded in the app and shown by the installer)
 tools/                      icon generator, screenshot + UI-automation QA scripts
 installer/vytrix.iss        Inno Setup script
@@ -148,6 +148,7 @@ These terms were drafted for this project and are not legal advice. Have a lawye
 - **New Year theme**: midnight navy and gold with a fireworks skyline (`Controls/NewYear.cs`) and gold glitter. Seasonal themes switch Christmas to New Year from 27 December to 6 January, then back to Graphite; a theme picked by hand is never changed.
 - **Move your setup to another PC** (Settings, `Services/TweakSetup.cs`): export the tweaks that are on to a `.vytrix.json` file; importing loads them into the Custom profile for review, never applying anything by itself.
 - **Code signing**: optional, see `docs/CODE-SIGNING.md`; set `VYTRIX_SIGN_THUMBPRINT` and `build.ps1` signs the app and installer.
+- **Accounts & sync (optional)** (`Services/Accounts.cs`, `Views/AccountPage.cs`): sign in with Google, Microsoft, GitHub, Discord or email through Supabase Auth (browser sign-in with PKCE and a loopback redirect; only the methods turned on in the project are shown). Save this PC's setup (tweaks that are on, Custom profile, appearance) and load it on another PC; tweaks go to the Custom profile for review. Refresh tokens are DPAPI-encrypted; access tokens stay in memory. Row Level Security in `server/supabase/schema.sql` limits every account to its own row; people can delete their synced data or account. Off until the project owner follows `docs/ACCOUNTS.md`.
 - **Global search** (Ctrl+K) across pages, tweaks, profiles and help topics.
 - **Reports:** HTML and JSON system reports in `Documents\VYTRIX Reports`.
 - **Auto-update from GitHub releases.** VYTRIX reads `releases/latest/download/latest.json` from [adamunlie-lab/VYTRIX](https://github.com/adamunlie-lab/VYTRIX/releases) at startup and every 6 hours.
@@ -167,7 +168,7 @@ This builds at that version, runs the tests, compiles the installer, computes th
 ## Testing
 
 ```powershell
-dotnet test tests\Vytrix.Tests\Vytrix.Tests.csproj     # 169 automated tests (admin ones skip unless elevated)
+dotnet test tests\Vytrix.Tests\Vytrix.Tests.csproj     # 182 automated tests (admin ones skip unless elevated)
 powershell -File tools\qa-music.ps1                     # carols: render, play (15% volume), pause, CPU
 powershell -File tools\qa-motion.ps1                    # proves the tree animates; CPU active vs minimised
 powershell -File tools\qa-theme-switch.ps1              # live theme switching via Settings

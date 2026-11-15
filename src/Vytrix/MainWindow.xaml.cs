@@ -44,6 +44,7 @@ public partial class MainWindow : Window
             new("services", "Services", "IcoServices", () => new ServicesPage(), "windows services startup type"),
             new("benchmark", "Benchmark", "IcoBenchmark", () => new BenchmarkPage(), "winsat score disk memory cpu speed test"),
             new("settings", "Settings", "IcoSettings", () => new SettingsPage(), "theme accent updates report export"),
+            new("account", "Account", "IcoUser", () => new AccountPage(), "account sign in login sync profile google microsoft github email cloud"),
             new("help", "Help", "IcoHelp", () => new HelpPage(), "help guide how to faq questions manual tutorial"),
         ];
         BuildNav();
@@ -366,7 +367,7 @@ public partial class MainWindow : Window
     {
         void Group(string label)
         {
-            NavPanel.Children.Add(new TextBlock { Text = label, Style = Ui.Style("Label"), Margin = new Thickness(14, NavPanel.Children.Count == 0 ? 0 : 14, 0, 5) });
+            NavPanel.Children.Add(new TextBlock { Text = label, Style = Ui.Style("Label"), Margin = new Thickness(14, NavPanel.Children.Count == 0 ? 0 : 10, 0, 4) });
         }
         Group("MAIN");
         foreach (var n in _nav)

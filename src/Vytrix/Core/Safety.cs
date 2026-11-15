@@ -316,7 +316,7 @@ public sealed class AppSettings
 public static class Terms
 {
     /// <summary>Bump when the terms text changes materially; users are asked to accept again.</summary>
-    public const string Version = "1.3";   // 1.1: GitHub update checks; 1.2: AI assistant (Claude); 1.3: free local AI mode
+    public const string Version = "1.4";   // 1.1: GitHub update checks; 1.2: AI assistant (Claude); 1.3: free local AI mode; 1.4: optional accounts
 
     public static string Text { get; } = Load();
 
