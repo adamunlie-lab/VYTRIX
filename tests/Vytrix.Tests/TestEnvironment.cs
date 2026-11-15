@@ -16,6 +16,8 @@ internal static class TestEnvironment
     {
         Directory.CreateDirectory(DataDir);
         Environment.SetEnvironmentVariable("VYTRIX_DATA_DIR", DataDir);
+        // Leave nothing behind in %TEMP% once the test run ends.
+        AppDomain.CurrentDomain.ProcessExit += (_, _) => { try { Directory.Delete(DataDir, true); } catch { } };
     }
 }
 

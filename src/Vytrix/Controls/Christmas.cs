@@ -334,9 +334,12 @@ public sealed class SnowField : Canvas
     private readonly Random _rng = new(24);
     private bool _running;
     private Size _builtFor;
+    private readonly Color _color;
 
-    public SnowField()
+    /// <summary>White snow by default; the New Year theme uses gold glitter.</summary>
+    public SnowField(Color? color = null)
     {
+        _color = color ?? Colors.White;
         IsHitTestVisible = false;
         ClipToBounds = true;
         SizeChanged += (_, e) =>
@@ -360,7 +363,7 @@ public sealed class SnowField : Canvas
             var flake = new System.Windows.Shapes.Ellipse
             {
                 Width = size, Height = size,
-                Fill = new RadialGradientBrush(Color.FromArgb(0xF0, 0xFF, 0xFF, 0xFF), Color.FromArgb(0x00, 0xFF, 0xFF, 0xFF)),
+                Fill = new RadialGradientBrush(Color.FromArgb(0xF0, _color.R, _color.G, _color.B), Color.FromArgb(0x00, _color.R, _color.G, _color.B)),
                 Opacity = 0.45 + _rng.NextDouble() * 0.5,
             };
             var move = new TranslateTransform();

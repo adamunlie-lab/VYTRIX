@@ -26,6 +26,15 @@ public static class Ollama
 
     public const string DownloadPage = "https://ollama.com/download/windows";
 
+    /// <summary>
+    /// Best Quality (8B, about 5.2 GB) runs well fully on a GPU with about 8 GB of video memory;
+    /// otherwise Standard (4B) is the safer choice.
+    /// </summary>
+    public static LocalModel Recommended(ulong dedicatedVideoBytes) =>
+        dedicatedVideoBytes >= 7UL * 1024 * 1024 * 1024 ? Models[1] : Models[0];
+
+    public static LocalModel RecommendedForThisPC() => Recommended(SystemInfo.PrimaryGpu?.DedicatedVideoMemory ?? 0);
+
     /// <summary>Overridable for tests (a local fake server).</summary>
     public static string BaseUrl { get; set; } = Environment.GetEnvironmentVariable("VYTRIX_OLLAMA_URL") is { Length: > 0 } u ? u.TrimEnd('/') : "http://127.0.0.1:11434";
 

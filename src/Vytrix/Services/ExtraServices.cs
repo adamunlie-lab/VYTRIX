@@ -378,6 +378,8 @@ public static class Profiles
 
     public static async Task<(bool, string)> ApplyAsync(OptProfile p, IProgress<string>? progress = null)
     {
+        // Measure first, so the Optimization page can show what the profile actually changed.
+        await Task.Run(() => PcSnapshots.SaveBaseline(p.Name));
         if (Settings.Current.CreateRestorePointBeforeProfiles && Elevation.IsAdmin)
         {
             progress?.Report("Creating a restore point…");

@@ -165,9 +165,14 @@ public sealed class AssistantPage : PageBase
         sp.Children.Add(ollamaButtons);
 
         // Step 2: model
-        var models = new ComboBox { Width = 330, HorizontalAlignment = HorizontalAlignment.Left };
-        foreach (var m in Ollama.Models) models.Items.Add(new ComboBoxItem { Content = $"{m.Name}  ·  {m.Size}", Tag = m.Id, ToolTip = m.Note, Style = Ui.Style("ComboItem") });
-        models.SelectedIndex = Math.Max(0, Array.FindIndex(Ollama.Models, m => m.Id == CurrentModel.Id));
+        var models = new ComboBox { Width = 380, HorizontalAlignment = HorizontalAlignment.Left };
+        var recommended = Ollama.RecommendedForThisPC();
+        foreach (var m in Ollama.Models)
+            models.Items.Add(new ComboBoxItem { Content = $"{m.Name}  ·  {m.Size}{(m.Id == recommended.Id ? "  ·  recommended for your PC" : "")}", Tag = m.Id, ToolTip = m.Note, Style = Ui.Style("ComboItem") });
+        // Until a model is chosen and downloaded, preselect the one that suits this PC's graphics memory.
+        bool chosen = Settings.Current.AssistantLocalModel != Ollama.Models[0].Id || _local is not null;
+        var preselect = chosen ? CurrentModel : recommended;
+        models.SelectedIndex = Math.Max(0, Array.FindIndex(Ollama.Models, m => m.Id == preselect.Id));
         var modelNote = new TextBlock { Style = Ui.Style("Muted"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 6, 0, 0) };
         var modelState = new TextBlock { FontSize = 13, TextWrapping = TextWrapping.Wrap, VerticalAlignment = VerticalAlignment.Center };
         var download = new Button { Content = "Download model", Style = Ui.Style("Primary"), Margin = new Thickness(10, 0, 0, 0) };
@@ -194,7 +199,8 @@ public sealed class AssistantPage : PageBase
         async Task Refresh()
         {
             var m = Ollama.Models.First(x => x.Id == Selected());
-            modelNote.Text = m.Note;
+            var vram = SystemInfo.PrimaryGpu?.DedicatedVideoMemory ?? 0;
+            modelNote.Text = m.Note + (vram > 0 ? $"  Your {SystemInfo.PrimaryGpu?.Name?.Trim()} has {vram / 1073741824.0:0} GB of video memory, so {recommended.Name} suits it best." : "");
             bool installed = Ollama.Installed;
             bool running = installed && await Ollama.EnsureRunningAsync();
             if (running)

@@ -189,12 +189,62 @@ public sealed class StartupPage : PageBase
         tm.Click += (_, _) => SysCmd.Open(SysCmd.SystemExe("taskmgr.exe"));
         HeaderActions.Children.Add(refresh);
         HeaderActions.Children.Add(tm);
+        var bootCard = Kit.Card(_boot, "Boot times", "How long your last few startups took. Disable apps you don't need below, then compare after your next restart.");
+        bootCard.Margin = new Thickness(0, 0, 0, 16);
+        Body.Children.Add(bootCard);
         if (TweakCatalog.ById("startup.delay") is { } d) Body.Children.Add(new TweakView(d, compact: true) { Margin = new Thickness(0, 0, 0, 16) });
         Body.Children.Add(_summary);
         Body.Children.Add(Kit.Card(_list));
     }
 
-    public override void OnShown() => _ = LoadAsync();
+    private readonly StackPanel _boot = new();
+
+    public override void OnShown() { _ = LoadAsync(); _ = LoadBootAsync(); }
+
+    private async Task LoadBootAsync()
+    {
+        _boot.Children.Clear();
+        _boot.Children.Add(new Spinner { Width = 20, Height = 20, Stroke = Ui.Res("AccentBrush"), HorizontalAlignment = HorizontalAlignment.Left });
+        var (boots, slow) = await Task.Run(() => (BootTime.Recent(8), BootTime.SlowItems()));
+        _boot.Children.Clear();
+        if (boots.Count == 0) { _boot.Children.Add(new TextBlock { Text = "Windows hasn't recorded any recent startups that VYTRIX can read.", Style = Ui.Style("Muted") }); return; }
+
+        bool measured = boots[0].Measured;
+        var latest = boots[0];
+        var older = boots.Skip(1).Select(b => b.Seconds).ToList();
+        var headline = new TextBlock { FontSize = 13.5, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 10) };
+        headline.Inlines.Add(new System.Windows.Documents.Run($"Last startup: {latest.Seconds:0.0} s") { FontWeight = FontWeights.SemiBold });
+        if (older.Count > 0)
+        {
+            var avg = older.Average();
+            var diff = latest.Seconds - avg;
+            headline.Inlines.Add(new System.Windows.Documents.Run(Math.Abs(diff) < 1
+                ? $"  ·  about the same as your average of {avg:0.0} s"
+                : $"  ·  {Math.Abs(diff):0.0} s {(diff < 0 ? "faster" : "slower")} than your average of {avg:0.0} s")
+            { Foreground = Ui.Res(diff < -1 ? "GoodBrush" : diff > 1 ? "WarnBrush" : "TextDimBrush") });
+        }
+        _boot.Children.Add(headline);
+
+        foreach (var b in boots)
+        {
+            var detail = b.DesktopReadySeconds is { } dr && b.BackgroundSeconds is { } bg ? $"desktop ready {dr:0.0} s, then {bg:0.0} s finishing in the background" : "";
+            _boot.Children.Add(Kit.KeyValue(b.When.ToString("ddd d MMM, HH:mm"), $"{b.Seconds:0.0} s" + (detail.Length > 0 ? $"   ({detail})" : "")));
+        }
+
+        if (measured && slow.Count > 0)
+        {
+            _boot.Children.Add(new TextBlock { Text = "SLOWING STARTUP (REPORTED BY WINDOWS)", Style = Ui.Style("Label"), Margin = new Thickness(0, 14, 0, 6) });
+            foreach (var s in slow)
+                _boot.Children.Add(Kit.KeyValue($"{s.Kind}", $"{s.Name}: added {s.DelaySeconds:0.0} s on {s.When:d MMM}"));
+        }
+        _boot.Children.Add(new TextBlock
+        {
+            Text = measured
+                ? "Measured by Windows from power-on until the desktop is ready and startup work is finished."
+                : "From power-on until you signed in, so it includes the time spent at the sign-in screen. In administrator mode VYTRIX shows Windows' own measurement and what's slowing startup.",
+            Style = Ui.Style("Muted"), FontSize = 11.5, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 12, 0, 0),
+        });
+    }
 
     private async Task LoadAsync()
     {

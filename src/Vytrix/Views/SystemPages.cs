@@ -400,6 +400,7 @@ public sealed class SettingsPage : PageBase
                 ToolTip = th switch
                 {
                     ThemeManager.Christmas => "Midnight pine palette, a twinkling Christmas tree, snowfall and optional carols.",
+                    ThemeManager.NewYear => "Midnight navy and gold, a city skyline with fireworks, and gold glitter.",
                     ThemeManager.CherryBlossom => "Night sakura palette with a swaying cherry tree and falling petals.",
                     _ => "The original graphite and violet look, no scenery.",
                 } };
@@ -409,6 +410,7 @@ public sealed class SettingsPage : PageBase
             {
                 if (s.Theme == name && ThemeManager.Current == name) return;
                 s.Theme = name;
+                s.NewYearThemeAutomatic = false;   // picked by hand: the seasonal switch leaves it alone
                 s.Accent = ThemeManager.DefaultAccent(name);   // each theme's signature accent
                 ThemeManager.ApplyTheme(name);
                 ThemeManager.Apply(s.Accent);
@@ -433,7 +435,8 @@ public sealed class SettingsPage : PageBase
             accents.Children.Add(rb);
         }
         look.Children.Add(accents);
-        look.Children.Add(Option("Falling petals & snow", "Petals (Cherry Blossom) or snow (Christmas) drift across the window.", s.ShowFallingPetals, v => s.ShowFallingPetals = v));
+        look.Children.Add(Option("Falling petals, snow & glitter", "Petals (Cherry Blossom), snow (Christmas) or gold glitter (New Year) drift across the window.", s.ShowFallingPetals, v => s.ShowFallingPetals = v));
+        look.Children.Add(Option("Seasonal themes", "Switches Christmas to New Year after Boxing Day, and back to Graphite after 6 January. A theme you pick yourself is never changed.", s.SeasonalThemes, v => s.SeasonalThemes = v));
         look.Children.Add(new TextBlock { Text = "CAROL VOLUME", Style = Ui.Style("Label"), Margin = new Thickness(0, 14, 0, 6) });
         var vol = new ComboBox { Width = 200, HorizontalAlignment = HorizontalAlignment.Left, ToolTip = "Music-box carols in the Christmas theme. They never start on their own." };
         foreach (var pct in new[] { 25, 40, 55, 70, 85, 100 })
@@ -509,10 +512,44 @@ public sealed class SettingsPage : PageBase
         data.Children.Add(new TextBlock { Text = $"VYTRIX {Updater.Current.ToString(3)} · Precision Performance. Zero Compromise.", Style = Ui.Style("Muted"), Margin = new Thickness(0, 16, 0, 0) });
         g.Children.Add(Kit.Card(data, "Data & reports"));
 
+        var setup = new StackPanel();
+        setup.Children.Add(new TextBlock { Text = "Save the tweaks that are on right now to a file, then load it on another PC. Loading never changes anything by itself: the tweaks go into your Custom profile so you can review them first.", Style = Ui.Style("Dim"), FontSize = 12.5, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 12) });
+        var exportSetup = Ui.IconButton("IcoExport", "Export my tweak setup", "Primary");
+        exportSetup.Click += (_, _) =>
+        {
+            var dlg = new Microsoft.Win32.SaveFileDialog { FileName = $"VYTRIX tweaks {DateTime.Now:yyyy-MM-dd}.vytrix.json", Filter = "VYTRIX tweak setup (*.vytrix.json)|*.vytrix.json|JSON (*.json)|*.json", DefaultExt = ".vytrix.json" };
+            if (dlg.ShowDialog() != true) return;
+            try
+            {
+                TweakSetup.Export(dlg.FileName);
+                Shell.Toast($"Saved {TweakSetup.Current().Tweaks.Count} tweaks to {System.IO.Path.GetFileName(dlg.FileName)}.", ToastKind.Success);
+            }
+            catch (Exception ex) { Shell.Toast("Couldn't save the file: " + ex.Message, ToastKind.Error); }
+        };
+        var importSetup = new Button { Content = "Import a tweak setup", Style = Ui.Style("Ghost"), Margin = new Thickness(8, 0, 0, 0) };
+        importSetup.Click += async (_, _) =>
+        {
+            var dlg = new Microsoft.Win32.OpenFileDialog { Filter = "VYTRIX tweak setup (*.vytrix.json;*.json)|*.vytrix.json;*.json" };
+            if (dlg.ShowDialog() != true) return;
+            TweakSetupImport imp;
+            try { imp = TweakSetup.Read(dlg.FileName); }
+            catch (Exception ex) { Shell.Toast(ex is System.IO.InvalidDataException ? ex.Message : "Couldn't read that file: " + ex.Message, ToastKind.Error); return; }
+            var body = new StackPanel();
+            body.Children.Add(new TextBlock { Text = $"{imp.Usable.Count} tweaks will be loaded into your Custom profile, replacing its current selection. Nothing is applied until you review the Custom profile and click Apply.", Style = Ui.Style("Dim"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 8) });
+            if (imp.Unsupported.Count > 0) body.Children.Add(Kit.Notice($"Not available on this PC: {string.Join(", ", imp.Unsupported.Select(t => t.Name))}.", "warn"));
+            if (imp.Unknown.Count > 0) body.Children.Add(Kit.Notice($"{imp.Unknown.Count} tweak(s) in the file aren't in this version of VYTRIX and will be skipped.", "warn"));
+            if (!await Shell.ConfirmAsync("Load this tweak setup?", body, "Load into Custom profile")) return;
+            TweakSetup.LoadIntoCustom(imp);
+            Shell.Toast("Loaded into your Custom profile. Review it, then click Apply.", ToastKind.Success);
+            Shell.Navigate("optimization");
+        };
+        setup.Children.Add(Kit.Row(exportSetup, importSetup));
+        g.Children.Add(Kit.Card(setup, "Move your setup to another PC"));
+
         var legal = new StackPanel();
         legal.Children.Add(Kit.KeyValue("Version", $"v{Terms.Version}"));
         legal.Children.Add(Kit.KeyValue("Accepted", s.AcceptedTermsAt is { } at && Terms.Accepted ? at.ToString("f") : "Not yet accepted"));
-        legal.Children.Add(new TextBlock { Text = "Covers what VYTRIX changes, your responsibilities, the limits of rollback, privacy (no data is collected), and the warranty disclaimer.", Style = Ui.Style("Muted"), Margin = new Thickness(0, 6, 0, 10) });
+        legal.Children.Add(new TextBlock { Text = "Covers what VYTRIX changes, your responsibilities, the limits of rollback, privacy (no analytics, and exactly what the optional AI modes send), and the warranty disclaimer.", Style = Ui.Style("Muted"), Margin = new Thickness(0, 6, 0, 10) });
         var view = Ui.IconButton("IcoInfo", "Read the Terms of Agreement", "Ghost");
         view.HorizontalAlignment = HorizontalAlignment.Left;
         view.Click += async (_, _) => await Shell.ShowTermsAsync(requireAcceptance: false);

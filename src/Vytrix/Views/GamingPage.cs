@@ -28,6 +28,30 @@ public sealed class GamingPage : PageBase
         ["upc.exe"] = "Ubisoft Connect", ["XboxPcApp.exe"] = "Xbox app", ["GameBar.exe"] = "Xbox Game Bar",
     };
 
+    private readonly StackPanel _driver = new();
+
+    private async Task LoadDriverAsync()
+    {
+        _driver.Children.Add(new Spinner { Width = 20, Height = 20, Stroke = Ui.Res("AccentBrush"), HorizontalAlignment = HorizontalAlignment.Left });
+        var drivers = await Task.Run(GpuDrivers.Read);
+        _driver.Children.Clear();
+        if (drivers.Count == 0) { _driver.Children.Add(new TextBlock { Text = "No NVIDIA, AMD or Intel graphics driver found.", Style = Ui.Style("Muted") }); return; }
+        foreach (var d in drivers)
+        {
+            _driver.Children.Add(new TextBlock { Text = d.Name, Style = Ui.Style("H3"), Margin = new Thickness(0, 0, 0, 6) });
+            _driver.Children.Add(Kit.KeyValue("Driver version", d.DisplayVersion + (d.DisplayVersion != d.RawVersion ? $"  (Windows: {d.RawVersion})" : "")));
+            _driver.Children.Add(Kit.KeyValue("Released", d.Date is { } dt ? $"{dt:d MMM yyyy}, {d.AgeText.Replace("released ", "")}" : "Unknown"));
+            var advice = new TextBlock { Text = d.Advice, TextWrapping = TextWrapping.Wrap, FontSize = 12.5, Margin = new Thickness(0, 8, 0, 10), Foreground = Ui.Res(d.Freshness switch { 0 => "GoodBrush", 1 => "WarnBrush", 2 => "BadBrush", _ => "TextDimBrush" }) };
+            _driver.Children.Add(advice);
+            var get = Ui.IconButton("IcoExport", $"Get the latest {d.Vendor} driver", d.Freshness >= 1 ? "Primary" : "Ghost");
+            get.HorizontalAlignment = HorizontalAlignment.Left;
+            get.ToolTip = "Opens the official driver download page in your browser.";
+            var url = d.DownloadUrl;
+            get.Click += (_, _) => SysCmd.Open(url);
+            _driver.Children.Add(get);
+        }
+    }
+
     protected override void Build()
     {
         Body.Children.Add(Kit.Section("Windows gaming features"));
@@ -37,6 +61,8 @@ public sealed class GamingPage : PageBase
 
         Body.Children.Add(Kit.Section("Graphics"));
         var gg = Kit.Grid(380, 2);
+        gg.Children.Add(Kit.Card(_driver, "Graphics driver", "Installed version and age, read from Windows"));
+        _ = LoadDriverAsync();
         gg.Children.Add(Kit.Card(_gpuInfo, "GPU scheduling status", "Read directly from the display driver (D3DKMT)"));
         var fso = new StackPanel();
         fso.Children.Add(new TextBlock { Text = "Fullscreen optimizations let Windows run \"exclusive fullscreen\" games through the desktop compositor, enabling fast Alt-Tab, overlays and Auto HDR with the same latency as true exclusive mode on modern Windows.", Style = Ui.Style("Dim"), FontSize = 12.5 });

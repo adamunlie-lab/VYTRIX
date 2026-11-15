@@ -15,3 +15,6 @@ foreach ($p in $Pages) {
     Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
     $proc.WaitForExit(5000) | Out-Null
 }
+
+Start-Sleep -Milliseconds 500
+Remove-QaDataDirs

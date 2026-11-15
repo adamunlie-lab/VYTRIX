@@ -34,12 +34,16 @@ public partial class App : Application
         // Developer aid: "--render-tree out.png" / "--render-christmas out.png" render a theme's scene to an image and exit.
         int rt = Array.IndexOf(e.Args, "--render-tree");
         int rc = Array.IndexOf(e.Args, "--render-christmas");
+        int rn = Array.IndexOf(e.Args, "--render-newyear");
         if (rc >= 0) rt = rc;
+        if (rn >= 0) rt = rn;
         if (rt >= 0 && rt + 1 < e.Args.Length)
         {
-            System.Windows.FrameworkElement tree = rc >= 0 ? new ChristmasTree() : new SakuraTree();
-            double w = rc >= 0 ? ChristmasTree.DesignWidth : SakuraTree.DesignWidth, h = rc >= 0 ? ChristmasTree.DesignHeight : SakuraTree.DesignHeight;
-            var bg = rc >= 0 ? System.Windows.Media.Color.FromRgb(0x09, 0x12, 0x10) : System.Windows.Media.Color.FromRgb(0x14, 0x0D, 0x13);
+            System.Windows.FrameworkElement tree = rn >= 0 ? new FireworksSky() : rc >= 0 ? new ChristmasTree() : new SakuraTree();
+            if (tree is FireworksSky fw) fw.ShowStill();   // show the bursts fully bloomed rather than a dark sky
+            double w = rn >= 0 ? FireworksSky.DesignWidth : rc >= 0 ? ChristmasTree.DesignWidth : SakuraTree.DesignWidth;
+            double h = rn >= 0 ? FireworksSky.DesignHeight : rc >= 0 ? ChristmasTree.DesignHeight : SakuraTree.DesignHeight;
+            var bg = rn >= 0 ? System.Windows.Media.Color.FromRgb(0x09, 0x0C, 0x1C) : rc >= 0 ? System.Windows.Media.Color.FromRgb(0x09, 0x12, 0x10) : System.Windows.Media.Color.FromRgb(0x14, 0x0D, 0x13);
             var frame = new System.Windows.Controls.Border { Background = new System.Windows.Media.SolidColorBrush(bg), Child = tree };
             frame.Measure(new Size(w, h));
             frame.Arrange(new Rect(0, 0, w, h));
@@ -116,6 +120,15 @@ public partial class App : Application
         {
             if (string.IsNullOrWhiteSpace(Settings.Current.UpdateFeedUrl)) Settings.Current.UpdateFeedUrl = Updater.DefaultFeed;
             Settings.Current.GitHubFeedIntroduced = true;
+            Settings.Save();
+        }
+        // Seasonal themes: Christmas becomes New Year after Boxing Day, and back to Graphite after 6 January.
+        if (Settings.Current.SeasonalThemes && ThemeManager.SeasonalSwitch(Settings.Current.Theme, DateTime.Now, Settings.Current.NewYearThemeAutomatic) is { } seasonal)
+        {
+            Log.Info("theme", $"Seasonal switch: {Settings.Current.Theme} → {seasonal}.");
+            Settings.Current.NewYearThemeAutomatic = seasonal == ThemeManager.NewYear;
+            Settings.Current.Theme = seasonal;
+            Settings.Current.Accent = ThemeManager.DefaultAccent(seasonal);
             Settings.Save();
         }
         ThemeManager.ApplyTheme(Settings.Current.Theme);

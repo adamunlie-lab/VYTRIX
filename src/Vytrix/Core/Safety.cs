@@ -306,6 +306,10 @@ public sealed class AppSettings
     /// <summary>"local" = free AI on this PC through Ollama; "claude" = Claude with the user's own key.</summary>
     public string AssistantMode { get; set; } = "local";
     public string AssistantLocalModel { get; set; } = "qwen3:4b";
+    /// <summary>Switch Christmas → New Year after Boxing Day, and back after 6 January.</summary>
+    public bool SeasonalThemes { get; set; } = true;
+    /// <summary>True when the New Year theme was chosen by the seasonal switch (so it may be switched back).</summary>
+    public bool NewYearThemeAutomatic { get; set; }
 }
 
 /// <summary>The VYTRIX Terms of Agreement (legal\TERMS.txt, embedded at build time).</summary>

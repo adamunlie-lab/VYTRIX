@@ -55,7 +55,8 @@ public class ThemeTests
     [Fact]
     public void Theme_names_are_stable()
     {
-        Assert.Equal(["Christmas", "Cherry Blossom", "Graphite"], ThemeManager.Themes);
+        Assert.Equal(["Christmas", "New Year", "Cherry Blossom", "Graphite"], ThemeManager.Themes);
+        Assert.Contains(ThemeManager.Accents, x => x.Name == "Gold");
         Assert.Contains(ThemeManager.Accents, x => x.Name == "Sakura");
         Assert.Contains(ThemeManager.Accents, x => x.Name == "Crimson");
         Assert.Equal("Christmas", new Core.AppSettings().Theme);

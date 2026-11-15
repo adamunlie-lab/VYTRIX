@@ -148,7 +148,9 @@ public partial class MainWindow : Window
     private PetalField? _petals;
     private ChristmasTree? _xmas;
     private SnowField? _snow;
-    private Viewbox? _sakuraBox, _xmasBox;
+    private FireworksSky? _fireworks;
+    private SnowField? _glitter;
+    private Viewbox? _sakuraBox, _xmasBox, _nyBox;
 
     // ───────────────────────── Splash
 
@@ -224,6 +226,7 @@ public partial class MainWindow : Window
             var (swatch1, swatch2, blurb) = t switch
             {
                 ThemeManager.Christmas => ("#C8102E", "#1D6B4A", "Midnight pine, twinkling tree, snowfall and carols"),
+                ThemeManager.NewYear => ("#D9A42B", "#1F274A", "Midnight skyline, fireworks and gold glitter"),
                 ThemeManager.CherryBlossom => ("#DB2777", "#C4B5FD", "Night sakura with a swaying cherry tree"),
                 _ => ("#8B5CF6", "#22D3EE", "The original graphite and violet"),
             };
@@ -262,6 +265,7 @@ public partial class MainWindow : Window
     public void SwitchTheme(string name)
     {
         Settings.Current.Theme = name;
+        Settings.Current.NewYearThemeAutomatic = false;   // picked by hand: the seasonal switch leaves it alone
         Settings.Current.Accent = ThemeManager.DefaultAccent(name);
         ThemeManager.ApplyTheme(name);
         ThemeManager.Apply(Settings.Current.Accent);
@@ -311,6 +315,18 @@ public partial class MainWindow : Window
             _snow = new SnowField();
             PetalHost.Children.Add(_snow);
         }
+        if (theme == ThemeManager.NewYear && _fireworks is null)
+        {
+            _fireworks = new FireworksSky();
+            _nyBox = new Viewbox
+            {
+                Child = _fireworks, Stretch = Stretch.Uniform, Height = 560, Width = 560 * FireworksSky.DesignWidth / FireworksSky.DesignHeight,
+                HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Bottom, Margin = new Thickness(0, 0, 0, -6),
+            };
+            SceneHost.Children.Add(_nyBox);
+            _glitter = new SnowField(Color.FromRgb(0xF6, 0xD0, 0x6F));
+            PetalHost.Children.Add(_glitter);
+        }
     }
 
     /// <summary>Raised with whether theme scenery may animate right now (Overview's hero listens).</summary>
@@ -324,20 +340,24 @@ public partial class MainWindow : Window
     private void UpdateScene()
     {
         var theme = ThemeManager.Current;
-        bool sakura = theme == ThemeManager.CherryBlossom, xmas = theme == ThemeManager.Christmas;
+        bool sakura = theme == ThemeManager.CherryBlossom, xmas = theme == ThemeManager.Christmas, ny = theme == ThemeManager.NewYear;
+        bool scenic = sakura || xmas || ny;
         EnsureSceneFor(theme);
-        // The Overview has its own hero, so the background tree steps aside there.
+        // The Overview has its own hero, so the background scene steps aside there.
         bool overview = _current is OverviewPage;
         bool particles = Settings.Current.ShowFallingPetals;
-        bool animate = (sakura || xmas) && IsActive && WindowState != WindowState.Minimized && !Settings.Current.ReduceMotion && !_dialogOpen;
+        bool animate = scenic && IsActive && WindowState != WindowState.Minimized && !Settings.Current.ReduceMotion && !_dialogOpen;
         if (_sakuraBox is not null) _sakuraBox.Visibility = sakura && !overview ? Visibility.Visible : Visibility.Collapsed;
         if (_xmasBox is not null) _xmasBox.Visibility = xmas && !overview ? Visibility.Visible : Visibility.Collapsed;
+        if (_nyBox is not null) _nyBox.Visibility = ny && !overview ? Visibility.Visible : Visibility.Collapsed;
         if (_petals is not null) { _petals.Visibility = sakura && particles ? Visibility.Visible : Visibility.Collapsed; _petals.SetRunning(animate && sakura && particles); }
         if (_snow is not null) { _snow.Visibility = xmas && particles ? Visibility.Visible : Visibility.Collapsed; _snow.SetRunning(animate && xmas && particles); }
+        if (_glitter is not null) { _glitter.Visibility = ny && particles ? Visibility.Visible : Visibility.Collapsed; _glitter.SetRunning(animate && ny && particles); }
         _sakura?.SetRunning(animate && sakura && !overview);
         _xmas?.SetRunning(animate && xmas && !overview);
-        SceneHost.Visibility = (sakura || xmas) && !overview ? Visibility.Visible : Visibility.Collapsed;
-        PetalHost.Visibility = (sakura || xmas) && particles ? Visibility.Visible : Visibility.Collapsed;
+        _fireworks?.SetRunning(animate && ny && !overview);
+        SceneHost.Visibility = scenic && !overview ? Visibility.Visible : Visibility.Collapsed;
+        PetalHost.Visibility = scenic && particles ? Visibility.Visible : Visibility.Collapsed;
         SceneAnimating = animate;
         SceneAnimationChanged?.Invoke(animate);
     }

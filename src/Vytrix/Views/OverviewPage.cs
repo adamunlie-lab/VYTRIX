@@ -147,7 +147,8 @@ public sealed class OverviewPage : PageBase
     private readonly ContentControl _heroArt = new() { Focusable = false, IsHitTestVisible = false };
     private SakuraTree? _heroSakura;
     private ChristmasTree? _heroXmas;
-    private Viewbox? _heroSakuraBox, _heroXmasBox;
+    private FireworksSky? _heroFireworks;
+    private Viewbox? _heroSakuraBox, _heroXmasBox, _heroFireworksBox;
     private FrameworkElement? _heroGraphite;
     private readonly TextBlock _heroBrand = new() { Style = Ui.Style("Label"), Margin = new Thickness(0, 0, 0, 10) };
     private readonly TextBlock _greeting = new() { Style = Ui.Style("H1"), FontSize = 30 };
@@ -209,6 +210,26 @@ public sealed class OverviewPage : PageBase
                     },
                 };
                 _heroBrand.Text = "VYTRIX  ·  CHRISTMAS EDITION";
+                break;
+            case ThemeManager.NewYear:
+                _heroFireworks ??= new FireworksSky();
+                _heroFireworksBox ??= new Viewbox
+                {
+                    Child = _heroFireworks, Stretch = Stretch.Uniform, Height = 270,
+                    HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Bottom, Margin = new Thickness(0, 0, 24, -10),
+                };
+                _heroArt.Content = _heroFireworksBox;
+                _hero.Background = new LinearGradientBrush
+                {
+                    StartPoint = new Point(0, 0), EndPoint = new Point(1, 1),
+                    GradientStops =
+                    {
+                        new GradientStop(Color.FromArgb(0xF4, 0x16, 0x1C, 0x3E), 0),
+                        new GradientStop(Color.FromArgb(0xF4, 0x0A, 0x0D, 0x22), 0.6),
+                        new GradientStop(Color.FromArgb(0xF4, 0x2A, 0x20, 0x10), 1),
+                    },
+                };
+                _heroBrand.Text = $"VYTRIX  ·  NEW YEAR {FireworksSky.CelebratedYear(DateTime.Now)}";
                 break;
             case ThemeManager.CherryBlossom:
                 _heroSakura ??= new SakuraTree();
@@ -276,6 +297,7 @@ public sealed class OverviewPage : PageBase
         bool run = MainWindow.SceneAnimating && IsVisible;
         _heroSakura?.SetRunning(run && ThemeManager.Current == ThemeManager.CherryBlossom);
         _heroXmas?.SetRunning(run && ThemeManager.Current == ThemeManager.Christmas);
+        _heroFireworks?.SetRunning(run && ThemeManager.Current == ThemeManager.NewYear);
     }
 
     private void UpdateGreeting(string? health)
@@ -290,6 +312,15 @@ public sealed class OverviewPage : PageBase
             int days = (christmas.Date - now.Date).Days;
             greeting = now.Month == 12 && now.Day == 25 ? "Merry Christmas" : now.Month == 12 && now.Day == 24 ? "Happy Christmas Eve"
                 : now.Month == 12 && now.Day == 26 ? "Happy Boxing Day" : days <= 60 ? $"{days} days until Christmas" : "Season's greetings";
+        }
+        if (ThemeManager.Current == ThemeManager.NewYear)
+        {
+            int year = FireworksSky.CelebratedYear(now);
+            var newYear = new DateTime(year, 1, 1);
+            int days = (newYear - now.Date).Days;
+            greeting = now.Month == 1 && now.Day == 1 ? "Happy New Year!"
+                : now.Month == 12 && now.Day == 31 ? "Happy New Year's Eve"
+                : days > 0 && days <= 60 ? $"{days} days until {year}" : $"Happy {year}";
         }
         _greeting.Text = greeting;
         _heroStatus.Text = health ?? "Checking your system…";
@@ -378,6 +409,7 @@ public sealed class OverviewPage : PageBase
     }
 
     // Tweak states rarely change on their own: re-read them once a minute, or right after a tweak changes.
+    private static List<GpuDriver>? _drivers;
     private List<(Tweak t, TweakState s)>? _tweakStates;
     private DateTime _tweakStatesAt;
     private bool _tweakHooked;
@@ -412,6 +444,9 @@ public sealed class OverviewPage : PageBase
         var up = TimeSpan.FromMilliseconds(VxNative.vx_get_uptime_ms());
         checks.Add((up.TotalDays < 7, "Uptime", up.TotalDays < 7 ? Fmt.Uptime(up) : $"{(int)up.TotalDays} days — a restart applies pending updates"));
         if (SystemInfo.Disks.Count > 0) checks.Add((SystemInfo.Disks.All(d => d.Health is "Healthy" or "Unknown"), "Disk health", string.Join(", ", SystemInfo.Disks.Select(d => d.Health)) + " (Windows Storage report)"));
+        _drivers ??= await Task.Run(GpuDrivers.Read);   // drivers don't change while VYTRIX is open
+        foreach (var d in _drivers.Where(d => d.Freshness >= 0))
+            checks.Add((d.Freshness < 2, "Graphics driver", $"{d.Vendor} {d.DisplayVersion}, {d.AgeText}{(d.Freshness == 2 ? " — update it on the Gaming page" : "")}"));
 
         _health.Children.Clear();
         int passing = checks.Count(c => c.ok);

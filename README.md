@@ -59,7 +59,7 @@ src/Vytrix/
                             ThemeManager, UI kit
   Views/                    one class per page
   Themes/Theme.xaml         palette, typography, custom icon set, control styles
-tests/Vytrix.Tests/         xUnit tests (135, incl. 13 admin)
+tests/Vytrix.Tests/         xUnit tests (169, incl. 13 admin)
 legal/TERMS.txt             Terms of Agreement (embedded in the app and shown by the installer)
 tools/                      icon generator, screenshot + UI-automation QA scripts
 installer/vytrix.iss        Inno Setup script
@@ -142,6 +142,12 @@ These terms were drafted for this project and are not legal advice. Have a lawye
 - **Settings:** theme, accent colour (Violet / Cyan / Emerald / Amber / Rose / Sakura), falling petals, reduced motion, monitoring interval, safety switches, update feed, report export and Explorer restart.
 - **Help:** a built-in guide (Views/HelpPage.cs, content in Services/Help.cs) with a quick start, topics with jump-to-page buttons, a badge legend, common questions and a filter. Help topics also appear in global search.
 - **AI Assistant (free by default):** chat about your PC (`Views/AssistantPage.cs`). The free mode runs an open model (Qwen3 4B or 8B) on the user's own PC through Ollama (`Services/LocalAI.cs`): VYTRIX can install Ollama with winget, downloads the model with a progress bar, and talks to it only on 127.0.0.1, so nothing leaves the PC. Optional Gemini mode (`gemini-3.8-flash`, free tier with the user's own Google AI Studio key, generateContent REST with thought signatures echoed back, `Services/Gemini.cs`) and Claude mode (`claude-opus-5-5`, official Anthropic C# SDK, `Services/Assistant.cs`) uses the user's own Anthropic API key, stored encrypted with Windows DPAPI. Both engines share the same tools. Claude gets read-only tools (PC overview, tweak list and details, profiles, top apps by memory, undoable change history) and one `suggest_actions` tool that turns recommendations into buttons. The assistant can never change anything itself: tweak buttons go through the normal confirmation and journal. "Share PC details" can be turned off; the computer name and user name are never sent. Server-side refusal fallbacks are enabled. Tests drive the full tool loop against a local fake of the Messages API (`AssistantTests`, `LocalAITests` against a fake Ollama, `GeminiTests` against a fake generateContent).
+- **Boot times** (Startup page, `Services/BootTime.cs`): Windows' measured boot time and the apps, drivers and services it flagged as slowing startup (Diagnostics-Performance events 100-103, administrator mode); in standard mode, power-on to sign-in from the System log, labelled as such.
+- **Before and after** (Optimization page, `Services/Snapshots.cs`): a snapshot of background processes, startup apps, CPU, memory and boot time is taken just before a profile is applied and compared with now; startup time updates after the next restart.
+- **Graphics driver check** (Gaming page and Overview health checks, `Services/Drivers.cs`): installed driver version (NVIDIA shown as its familiar number, e.g. 621.24), release date, plain-language advice and a link to the official download page.
+- **New Year theme**: midnight navy and gold with a fireworks skyline (`Controls/NewYear.cs`) and gold glitter. Seasonal themes switch Christmas to New Year from 27 December to 6 January, then back to Graphite; a theme picked by hand is never changed.
+- **Move your setup to another PC** (Settings, `Services/TweakSetup.cs`): export the tweaks that are on to a `.vytrix.json` file; importing loads them into the Custom profile for review, never applying anything by itself.
+- **Code signing**: optional, see `docs/CODE-SIGNING.md`; set `VYTRIX_SIGN_THUMBPRINT` and `build.ps1` signs the app and installer.
 - **Global search** (Ctrl+K) across pages, tweaks, profiles and help topics.
 - **Reports:** HTML and JSON system reports in `Documents\VYTRIX Reports`.
 - **Auto-update from GitHub releases.** VYTRIX reads `releases/latest/download/latest.json` from [adamunlie-lab/VYTRIX](https://github.com/adamunlie-lab/VYTRIX/releases) at startup and every 6 hours.
@@ -161,7 +167,7 @@ This builds at that version, runs the tests, compiles the installer, computes th
 ## Testing
 
 ```powershell
-dotnet test tests\Vytrix.Tests\Vytrix.Tests.csproj     # 135 automated tests (admin ones skip unless elevated)
+dotnet test tests\Vytrix.Tests\Vytrix.Tests.csproj     # 169 automated tests (admin ones skip unless elevated)
 powershell -File tools\qa-music.ps1                     # carols: render, play (15% volume), pause, CPU
 powershell -File tools\qa-motion.ps1                    # proves the tree animates; CPU active vs minimised
 powershell -File tools\qa-theme-switch.ps1              # live theme switching via Settings

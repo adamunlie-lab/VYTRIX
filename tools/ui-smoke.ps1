@@ -140,3 +140,7 @@ $exited = $p.WaitForExit(5000)
 Check 'Closes cleanly within 5 s' $exited
 if (-not $exited) { $p.Kill() }
 $results | Format-Table -AutoSize | Out-String -Width 200
+
+# Leave nothing behind in %TEMP%.
+Start-Sleep -Milliseconds 500
+Remove-QaDataDirs

@@ -190,15 +190,52 @@ public static class ThemeManager
         ("Rose", Color.FromRgb(0xF4, 0x3F, 0x5E), Color.FromRgb(0xFB, 0x71, 0x85)),
         ("Sakura", Color.FromRgb(0xDB, 0x27, 0x77), Color.FromRgb(0xF4, 0x72, 0xB6)),
         ("Crimson", Color.FromRgb(0xC8, 0x10, 0x2E), Color.FromRgb(0xE6, 0x39, 0x46)),
+        ("Gold", Color.FromRgb(0xD9, 0xA4, 0x2B), Color.FromRgb(0xF6, 0xD0, 0x6F)),
     ];
 
     public const string Christmas = "Christmas";
+    public const string NewYear = "New Year";
     public const string CherryBlossom = "Cherry Blossom";
     public const string Graphite = "Graphite";
-    public static readonly string[] Themes = [Christmas, CherryBlossom, Graphite];
+    public static readonly string[] Themes = [Christmas, NewYear, CherryBlossom, Graphite];
 
     /// <summary>The signature accent each theme switches to when selected.</summary>
-    public static string DefaultAccent(string theme) => theme switch { Christmas => "Crimson", CherryBlossom => "Sakura", _ => "Violet" };
+    public static string DefaultAccent(string theme) => theme switch { Christmas => "Crimson", NewYear => "Gold", CherryBlossom => "Sakura", _ => "Violet" };
+
+    /// <summary>
+    /// Seasonal switching: Christmas becomes New Year from 27 December to 6 January, and an
+    /// automatically chosen New Year theme steps back to Graphite afterwards. Returns null for no change.
+    /// </summary>
+    public static string? SeasonalSwitch(string current, DateTime today, bool newYearWasAutomatic)
+    {
+        bool newYearSeason = (today.Month == 12 && today.Day >= 27) || (today.Month == 1 && today.Day <= 6);
+        if (newYearSeason && current == Christmas) return NewYear;
+        if (!newYearSeason && current == NewYear && newYearWasAutomatic) return Graphite;
+        return null;
+    }
+
+    // Midnight-navy palette with champagne gold: the colours of a New Year's Eve sky.
+    private static readonly Dictionary<string, Color> NewYearPalette = new()
+    {
+        ["BgBrush"] = Color.FromRgb(0x09, 0x0C, 0x1C),
+        ["SidebarBrush"] = Color.FromRgb(0x0C, 0x10, 0x24),
+        ["SurfaceBrush"] = Color.FromArgb(0xEE, 0x11, 0x16, 0x2E),
+        ["Surface2Brush"] = Color.FromArgb(0xF2, 0x16, 0x1C, 0x38),
+        ["Surface3Brush"] = Color.FromRgb(0x1F, 0x27, 0x4A),
+        ["BorderBrush"] = Color.FromRgb(0x26, 0x2F, 0x55),
+        ["BorderStrongBrush"] = Color.FromRgb(0x36, 0x40, 0x6C),
+        ["TextBrush"] = Color.FromRgb(0xF7, 0xF3, 0xE8),
+        ["TextDimBrush"] = Color.FromRgb(0xC8, 0xCB, 0xDC),
+        ["TextMutedBrush"] = Color.FromRgb(0x85, 0x8C, 0xAD),
+        ["GoodBrush"] = Color.FromRgb(0x86, 0xEF, 0xAC),
+        ["WarnBrush"] = Color.FromRgb(0xF6, 0xD0, 0x6F),
+        ["BadBrush"] = Color.FromRgb(0xFF, 0x7A, 0x9C),
+        ["GoodSoftBrush"] = Color.FromArgb(0x1F, 0x86, 0xEF, 0xAC),
+        ["WarnSoftBrush"] = Color.FromArgb(0x1F, 0xF6, 0xD0, 0x6F),
+        ["BadSoftBrush"] = Color.FromArgb(0x1F, 0xFF, 0x7A, 0x9C),
+        ["Accent2Brush"] = Color.FromRgb(0x7D, 0xD3, 0xFC),
+    };
+    private static readonly Color[] NewYearLogo = [Color.FromRgb(0xFF, 0xF1, 0xC1), Color.FromRgb(0xF6, 0xD0, 0x6F), Color.FromRgb(0xC4, 0xB5, 0xFD)];
 
     // Midnight-pine palette: deep evergreen surfaces, warm snow-white text, crimson and gold accents.
     private static readonly Dictionary<string, Color> ChristmasPalette = new()
@@ -266,10 +303,10 @@ public static class ThemeManager
         _graphiteLogo ??= logo.GradientStops.Select(s => s.Color).ToArray();
 
         if (!Themes.Contains(name)) name = Christmas;
-        var map = name switch { CherryBlossom => SakuraPalette, Christmas => ChristmasPalette, _ => _graphite };
+        var map = name switch { CherryBlossom => SakuraPalette, Christmas => ChristmasPalette, NewYear => NewYearPalette, _ => _graphite };
         foreach (var (key, color) in map) SetColor(res, key, color);
         // Gradient stops from XAML are read-only, so the logo brush is replaced (consumers use DynamicResource).
-        var stops = name switch { CherryBlossom => SakuraLogo, Christmas => ChristmasLogo, _ => _graphiteLogo };
+        var stops = name switch { CherryBlossom => SakuraLogo, Christmas => ChristmasLogo, NewYear => NewYearLogo, _ => _graphiteLogo };
         var newLogo = new LinearGradientBrush { StartPoint = logo.StartPoint, EndPoint = logo.EndPoint };
         for (int i = 0; i < stops.Length; i++) newLogo.GradientStops.Add(new GradientStop(stops[i], stops.Length == 1 ? 0 : i / (double)(stops.Length - 1)));
         res["LogoBrush"] = newLogo;

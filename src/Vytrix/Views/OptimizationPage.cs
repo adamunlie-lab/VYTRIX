@@ -21,6 +21,10 @@ public sealed class OptimizationPage : PageBase
     {
         Body.Children.Add(Kit.Section("Optimization profiles"));
         Body.Children.Add(_profiles);
+        _beforeAfterCard = Kit.Card(_beforeAfter, "Before and after", "Measured just before you applied a profile, compared with now.");
+        _beforeAfterCard.Margin = new Thickness(0, 14, 0, 0);
+        _beforeAfterCard.Visibility = Visibility.Collapsed;
+        Body.Children.Add(_beforeAfterCard);
 
         Body.Children.Add(Kit.Section("Custom profile"));
         Body.Children.Add(Kit.Card(_custom, "Build your own profile", "Pick exactly which tweaks and power plan your Custom profile applies. Saved automatically."));
@@ -52,8 +56,49 @@ public sealed class OptimizationPage : PageBase
         Body.Children.Add(grid);
     }
 
+    private readonly StackPanel _beforeAfter = new();
+    private Border? _beforeAfterCard;
+
+    private async Task BuildBeforeAfterAsync()
+    {
+        var before = PcSnapshots.Baseline();
+        if (before is null || _beforeAfterCard is null) { if (_beforeAfterCard is not null) _beforeAfterCard.Visibility = Visibility.Collapsed; return; }
+        var now = await Task.Run(() => PcSnapshots.Capture());
+        var rows = PcSnapshots.Compare(before, now);
+        _beforeAfter.Children.Clear();
+        _beforeAfter.Children.Add(new TextBlock { Text = $"{before.Profile} profile applied {before.At:ddd d MMM, HH:mm}", Style = Ui.Style("Dim"), FontSize = 12.5, Margin = new Thickness(0, 0, 0, 10) });
+        var grid = new Grid();
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1.4, GridUnitType.Star) });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1.2, GridUnitType.Star) });
+        void Cell(int r, int c, string text, string style = "", string? brush = null, string? tip = null)
+        {
+            var tb = new TextBlock { Text = text, FontSize = 12.5, Margin = new Thickness(0, 4, 8, 4), TextWrapping = TextWrapping.Wrap };
+            if (style.Length > 0) tb.Style = Ui.Style(style);
+            if (brush is not null) tb.Foreground = Ui.Res(brush);
+            if (tip is not null) tb.ToolTip = tip;
+            Grid.SetRow(tb, r); Grid.SetColumn(tb, c);
+            grid.Children.Add(tb);
+        }
+        grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        Cell(0, 0, "MEASURE", "Label"); Cell(0, 1, "BEFORE", "Label"); Cell(0, 2, "NOW", "Label");
+        int r = 1;
+        foreach (var row in rows)
+        {
+            grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            Cell(r, 0, row.Label, tip: row.Note);
+            Cell(r, 1, row.Before, "Dim");
+            Cell(r, 2, row.After + (row.Better > 0 ? "  ▼ better" : row.Better < 0 ? "  ▲ higher" : ""), brush: row.Better > 0 ? "GoodBrush" : row.Better < 0 ? "WarnBrush" : null, tip: row.Note);
+            r++;
+        }
+        _beforeAfter.Children.Add(grid);
+        _beforeAfter.Children.Add(new TextBlock { Text = "CPU and memory change with whatever you have open, so compare them with similar apps running. Startup time updates after a restart.", Style = Ui.Style("Muted"), FontSize = 11.5, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 10, 0, 0) });
+        _beforeAfterCard.Visibility = Visibility.Visible;
+    }
+
     public override void OnShown()
     {
+        _ = BuildBeforeAfterAsync();
         BuildProfiles();
         BuildCustom();
         _ = BuildRecommendationsAsync();
@@ -149,6 +194,7 @@ public sealed class OptimizationPage : PageBase
 
         await Kit.RunAsync(trigger, () => Profiles.ApplyAsync(p, new Progress<string>(s => Log.Info("profile", s))));
         BuildProfiles();
+        _ = BuildBeforeAfterAsync();
         _ = BuildRecommendationsAsync();
     }
 
