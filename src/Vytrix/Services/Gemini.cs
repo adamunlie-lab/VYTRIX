@@ -83,14 +83,20 @@ public sealed class GeminiAssistant
         _contents.Add(new JsonObject { ["role"] = "user", ["parts"] = new JsonArray(new JsonObject { ["text"] = text }) });
         TurnCount++;
         int turnStart = _contents.Count;
+        // Every question starts with the most responsive model, and if every model is busy the list is
+        // tried a second time after a short pause (Google's "high demand" errors are usually brief).
+        _modelIndex = 0;
+        int attemptsLeft = _models.Length * 2;
         while (true)
         {
             try { return await RunTurnAsync(sharePcDetails, status, ct); }
-            catch (GeminiException g) when (TryNextModel(g) && _modelIndex < _models.Length - 1)
+            catch (GeminiException g) when (TryNextModel(g) && --attemptsLeft > 0)
             {
-                Log.Warn("assistant", $"{Model} unavailable ({(int)g.Status}); trying {_models[_modelIndex + 1]}.");
-                _modelIndex++;
-                status?.Report("Gemini is busy, trying another free model…");
+                int next = (_modelIndex + 1) % _models.Length;
+                Log.Warn("assistant", $"{Model} unavailable ({(int)g.Status}); trying {_models[next]}.");
+                if (next == 0) { status?.Report("All free Gemini models are busy, trying again…"); await Task.Delay(CyclePause, ct); }
+                else status?.Report("Gemini is busy, trying another free model…");
+                _modelIndex = next;
                 // Restart this question on the next model. Thought signatures belong to the model that made
                 // them, so drop this turn's partial work and the signatures on earlier turns.
                 if (_contents.Count > turnStart) _contents.RemoveRange(turnStart, _contents.Count - turnStart);
@@ -121,29 +127,7 @@ public sealed class GeminiAssistant
                     ["thinkingConfig"] = new JsonObject { ["thinkingLevel"] = "low" },
                 },
             };
-            using var msg = new HttpRequestMessage(HttpMethod.Post, $"{_baseUrl}/v1beta/models/{Model}:generateContent")
-            {
-                Content = new StringContent(request.ToJsonString(), Encoding.UTF8, "application/json"),
-            };
-            msg.Headers.Add("x-goog-api-key", _key);
-            var sw = System.Diagnostics.Stopwatch.StartNew();
-            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
-            timeout.CancelAfter(RequestTimeout);
-            HttpResponseMessage resp;
-            string body;
-            try
-            {
-                resp = await Http.SendAsync(msg, timeout.Token);
-                body = await resp.Content.ReadAsStringAsync(timeout.Token);
-            }
-            catch (OperationCanceledException) when (!ct.IsCancellationRequested)
-            {
-                Log.Warn("assistant", $"Gemini round {round + 1} timed out after {sw.Elapsed.TotalSeconds:N0}s.");
-                throw new GeminiException(HttpStatusCode.RequestTimeout, null);
-            }
-            using var _ = resp;
-            Log.Info("assistant", $"Gemini round {round + 1}: HTTP {(int)resp.StatusCode} in {sw.Elapsed.TotalSeconds:N1}s.");
-            if (!resp.IsSuccessStatusCode) throw new GeminiException(resp.StatusCode, ErrorMessage(body));
+            var body = await PostWithRetryAsync(request.ToJsonString(), round, status, ct);
 
             var root = JsonNode.Parse(body);
             if (root?["promptFeedback"]?["blockReason"] is not null || root?["candidates"] is not JsonArray { Count: > 0 } cands)
@@ -195,6 +179,52 @@ public sealed class GeminiAssistant
             _contents.Add(new JsonObject { ["role"] = "user", ["parts"] = responses });
         }
         return new AssistantReply((lastText + "\n\n(Stopped after looking up a lot of information. Ask again to continue.)").Trim(), actions);
+    }
+
+    /// <summary>Pauses before retrying the same model after a brief "busy" error; tests shorten these.</summary>
+    internal static TimeSpan[] BusyRetryDelays { get; set; } = [TimeSpan.FromSeconds(1.5), TimeSpan.FromSeconds(4)];
+    internal static TimeSpan CyclePause { get; set; } = TimeSpan.FromSeconds(3);
+
+    /// <summary>
+    /// Sends one request to the current model. A brief "busy" error (5xx) is retried on the same model
+    /// first, which keeps this question's work and thought signatures valid; anything else is thrown.
+    /// </summary>
+    private async Task<string> PostWithRetryAsync(string json, int round, IProgress<string>? status, CancellationToken ct)
+    {
+        for (int attempt = 0; ; attempt++)
+        {
+            using var msg = new HttpRequestMessage(HttpMethod.Post, $"{_baseUrl}/v1beta/models/{Model}:generateContent")
+            {
+                Content = new StringContent(json, Encoding.UTF8, "application/json"),
+            };
+            msg.Headers.Add("x-goog-api-key", _key);
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            timeout.CancelAfter(RequestTimeout);
+            HttpResponseMessage resp;
+            string body;
+            try
+            {
+                resp = await Http.SendAsync(msg, timeout.Token);
+                body = await resp.Content.ReadAsStringAsync(timeout.Token);
+            }
+            catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+            {
+                Log.Warn("assistant", $"{Model} round {round + 1} timed out after {sw.Elapsed.TotalSeconds:N0}s.");
+                throw new GeminiException(HttpStatusCode.RequestTimeout, null);
+            }
+            using var _ = resp;
+            Log.Info("assistant", $"{Model} round {round + 1}: HTTP {(int)resp.StatusCode} in {sw.Elapsed.TotalSeconds:N1}s.");
+            if (resp.IsSuccessStatusCode) return body;
+            bool busy = (int)resp.StatusCode >= 500;
+            if (busy && attempt < BusyRetryDelays.Length)
+            {
+                status?.Report("Gemini is busy, retrying…");
+                await Task.Delay(BusyRetryDelays[attempt], ct);
+                continue;
+            }
+            throw new GeminiException(resp.StatusCode, ErrorMessage(body));
+        }
     }
 
     private void RollBackTurn()

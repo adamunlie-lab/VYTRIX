@@ -14,6 +14,14 @@ public class GeminiTests
     });
 
     private const string Key = "AIzaFAKEKEYFORTESTSONLY0000000000000000";
+    private const string Busy = """{"error":{"code":503,"message":"This model is currently experiencing high demand.","status":"UNAVAILABLE"}}""";
+
+    public GeminiTests()
+    {
+        // Keep the retry pauses short in tests; only these tests use the Gemini engine.
+        GeminiAssistant.BusyRetryDelays = [TimeSpan.FromMilliseconds(10), TimeSpan.FromMilliseconds(10)];
+        GeminiAssistant.CyclePause = TimeSpan.FromMilliseconds(10);
+    }
 
     [Fact]
     public async Task Tool_loop_echoes_thought_signatures_and_returns_validated_buttons()
@@ -62,7 +70,8 @@ public class GeminiTests
     [Fact]
     public async Task Free_limit_is_explained()
     {
-        using var fake = new AssistantTests.FakeClaude((429, """{"error":{"code":429,"message":"Resource has been exhausted (e.g. check quota).","status":"RESOURCE_EXHAUSTED"}}"""));
+        const string limit = """{"error":{"code":429,"message":"Resource has been exhausted (e.g. check quota).","status":"RESOURCE_EXHAUSTED"}}""";
+        using var fake = new AssistantTests.FakeClaude((429, limit), (429, limit));   // tried, then tried once more after a pause
         var ex = await Assert.ThrowsAsync<GeminiException>(() => new GeminiAssistant(Key, "gemini-3.6-flash", fake.Url).SendAsync("hi", true));
         Assert.Contains("free limit", GeminiAssistant.Describe(ex));
     }
@@ -102,8 +111,8 @@ public class GeminiTests
             var g = new GeminiAssistant(Key, baseUrl: $"http://127.0.0.1:{port}");
             var sw = System.Diagnostics.Stopwatch.StartNew();
             var ex = await Assert.ThrowsAsync<GeminiException>(() => g.SendAsync("hi", true));
-            // Every free model is tried once, each with the short timeout.
-            Assert.True(sw.Elapsed < TimeSpan.FromSeconds(15));
+            // Every free model is tried twice, each with the short timeout.
+            Assert.True(sw.Elapsed < TimeSpan.FromSeconds(20));
             Assert.Contains("all busy", GeminiAssistant.Describe(ex));
         }
         finally { GeminiAssistant.RequestTimeout = old; l.Stop(); }
@@ -113,22 +122,45 @@ public class GeminiTests
     public async Task An_overloaded_model_falls_back_to_the_next_free_model_and_restarts_the_turn()
     {
         using var fake = new AssistantTests.FakeClaude(
-            // First model: starts a tool call, then is overloaded on the follow-up.
+            // First model: starts a tool call, then stays overloaded through both same-model retries.
             (200, Reply("STOP", new { functionCall = new { name = "list_profiles", args = new { } }, thoughtSignature = "sig-from-A" })),
-            (503, """{"error":{"code":503,"message":"This model is currently experiencing high demand.","status":"UNAVAILABLE"}}"""),
+            (503, Busy), (503, Busy), (503, Busy),
             // Second model answers the whole question from the start.
-            (200, Reply("STOP", new { text = "All good." })));
+            (200, Reply("STOP", new { text = "All good." })),
+            // The next question starts with the first model again.
+            (200, Reply("STOP", new { text = "Still good." })));
         var g = new GeminiAssistant(Key, ["model-a", "model-b"], fake.Url);
         var reply = await g.SendAsync("Is my PC OK?", true);
 
         Assert.Equal("All good.", reply.Text);
-        Assert.Equal("model-b", g.Model);   // stays on the model that worked
-        Assert.Equal(["/v1beta/models/model-a:generateContent", "/v1beta/models/model-a:generateContent", "/v1beta/models/model-b:generateContent"], fake.Paths);
-        // The retry starts the question over, without model A's partial tool exchange or its signature.
-        var c = fake.Requests[2].Body.RootElement.GetProperty("contents");
+        Assert.Equal("model-b", g.Model);
+        const string A = "/v1beta/models/model-a:generateContent", B = "/v1beta/models/model-b:generateContent";
+        Assert.Equal([A, A, A, A, B], fake.Paths);
+        // The switch starts the question over, without model A's partial tool exchange or its signature.
+        var c = fake.Requests[4].Body.RootElement.GetProperty("contents");
         Assert.Equal(1, c.GetArrayLength());
-        Assert.DoesNotContain("sig-from-A", fake.Requests[2].Body.RootElement.GetRawText());
+        Assert.DoesNotContain("sig-from-A", fake.Requests[4].Body.RootElement.GetRawText());
         Assert.Equal(2, g.MessageCount);
+
+        Assert.Equal("Still good.", (await g.SendAsync("And now?", true)).Text);
+        Assert.Equal(A, fake.Paths[^1]);   // a busy model isn't remembered as broken
+    }
+
+    [Fact]
+    public async Task A_brief_busy_error_is_retried_on_the_same_model_keeping_the_work()
+    {
+        using var fake = new AssistantTests.FakeClaude(
+            (200, Reply("STOP", new { functionCall = new { name = "list_profiles", args = new { } }, thoughtSignature = "sig-A" })),
+            (503, Busy),
+            (200, Reply("STOP", new { text = "Done checking." })));
+        var g = new GeminiAssistant(Key, ["model-a", "model-b"], fake.Url);
+        var reply = await g.SendAsync("Which profile?", true);
+
+        Assert.Equal("Done checking.", reply.Text);
+        Assert.All(fake.Paths, p => Assert.Contains("model-a", p));
+        // The retry carries the tool exchange and its signature, unchanged.
+        Assert.Contains("sig-A", fake.Requests[2].Body.RootElement.GetRawText());
+        Assert.Equal(4, g.MessageCount);
     }
 
     [Fact]
