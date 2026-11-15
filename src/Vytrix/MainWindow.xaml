@@ -62,7 +62,7 @@
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
                 <Grid HorizontalAlignment="Left" Margin="32,8,0,0" Width="360" WindowChrome.IsHitTestVisibleInChrome="True">
-                    <TextBox x:Name="GlobalSearch" Tag="Search tweaks, pages and settings   (Ctrl+K)" Padding="34,6,10,6"
+                    <TextBox x:Name="GlobalSearch" Tag="Search tweaks, pages and help   (Ctrl+K)" Padding="34,6,10,6"
                              TextChanged="GlobalSearch_TextChanged" PreviewKeyDown="GlobalSearch_KeyDown" LostKeyboardFocus="GlobalSearch_LostFocus"/>
                     <Path Data="{StaticResource IcoSearch}" Style="{StaticResource Icon}" Width="14" Height="14" HorizontalAlignment="Left" Margin="12,0,0,0" IsHitTestVisible="False"/>
                     <Popup x:Name="SearchPopup" PlacementTarget="{Binding ElementName=GlobalSearch}" Placement="Bottom" AllowsTransparency="True" StaysOpen="True" Width="460">

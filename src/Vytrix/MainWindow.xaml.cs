@@ -43,6 +43,7 @@ public partial class MainWindow : Window
             new("services", "Services", "IcoServices", () => new ServicesPage(), "windows services startup type"),
             new("benchmark", "Benchmark", "IcoBenchmark", () => new BenchmarkPage(), "winsat score disk memory cpu speed test"),
             new("settings", "Settings", "IcoSettings", () => new SettingsPage(), "theme accent updates report export"),
+            new("help", "Help", "IcoHelp", () => new HelpPage(), "help guide how to faq questions manual tutorial"),
         ];
         BuildNav();
         UpdateAdminState();
@@ -423,6 +424,8 @@ public partial class MainWindow : Window
             hits.Add(new SearchHit(t.Name, $"Tweak · {t.ComponentLabel}", "IcoTweaks", () => Navigate("tweaks", p => ((TweaksPage)p).Focus(t.Id))));
         foreach (var p in Profiles.All.Where(p => M(p.Name) || M(p.Description)))
             hits.Add(new SearchHit($"{p.Name} profile", "Optimization profile", "IcoOptimize", () => Navigate("optimization")));
+        foreach (var t in HelpContent.Topics.Where(t => M(t.Title) || M(t.Keywords) || M(t.Summary)))
+            hits.Add(new SearchHit(t.Title, "Help topic", "IcoHelp", () => Navigate("help", p => ((HelpPage)p).Focus(t.Id))));
         return hits.Take(12).ToList();
     }
 

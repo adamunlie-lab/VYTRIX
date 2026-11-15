@@ -52,7 +52,11 @@ public partial class App : Application
             return;
         }
         // One instance per user session. An elevated relaunch passes --elevated and waits for the old one to exit.
-        _single = new Mutex(false, @"Local\VYTRIX-SingleInstance");
+        // A QA/test copy with its own data folder (VYTRIX_DATA_DIR) gets its own instance slot,
+        // so it can run beside the user's real VYTRIX without touching it.
+        string? dataDir = Environment.GetEnvironmentVariable("VYTRIX_DATA_DIR");
+        string slot = string.IsNullOrWhiteSpace(dataDir) ? "" : "-" + Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(dataDir.Trim().ToLowerInvariant())))[..16];
+        _single = new Mutex(false, @"Local\VYTRIX-SingleInstance" + slot);
         var wait = e.Args.Contains("--elevated") ? TimeSpan.FromSeconds(10) : TimeSpan.Zero;
         bool owned;
         try { owned = _single.WaitOne(wait); } catch (AbandonedMutexException) { owned = true; }

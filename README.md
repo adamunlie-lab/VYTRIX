@@ -140,7 +140,8 @@ These terms were drafted for this project and are not legal advice. Have a lawye
   - Petals drift across the window. You can turn them off.
   - The scene animates only while VYTRIX is the active window. It pauses when minimised, in the background or with Reduce motion on, and costs about 0.3–0.5% CPU while animating.
 - **Settings:** theme, accent colour (Violet / Cyan / Emerald / Amber / Rose / Sakura), falling petals, reduced motion, monitoring interval, safety switches, update feed, report export and Explorer restart.
-- **Global search** (Ctrl+K) across pages, tweaks and profiles.
+- **Help:** a built-in guide (Views/HelpPage.cs, content in Services/Help.cs) with a quick start, topics with jump-to-page buttons, a badge legend, common questions and a filter. Help topics also appear in global search.
+- **Global search** (Ctrl+K) across pages, tweaks, profiles and help topics.
 - **Reports:** HTML and JSON system reports in `Documents\VYTRIX Reports`.
 - **Auto-update from GitHub releases.** VYTRIX reads `releases/latest/download/latest.json` from [adamunlie-lab/VYTRIX](https://github.com/adamunlie-lab/VYTRIX/releases) at startup and every 6 hours.
   - If there's a newer version, it downloads the installer in the background (only from GitHub release hosting, including after redirects) and verifies its SHA-256.
@@ -182,7 +183,7 @@ The automated tests cover:
 Tests run in an isolated data folder (`VYTRIX_DATA_DIR`) and a scratch registry key that is deleted afterwards.
 
 The UI smoke test checks:
-- startup time, and navigation to all 14 pages;
+- startup time, and navigation to all 15 pages;
 - the storage scan, and that the delete confirmation dialog appears and Cancel aborts it;
 - the profile review dialog;
 - idle CPU under 2% and working set under 400 MB;

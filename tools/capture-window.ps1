@@ -1,5 +1,5 @@
 # Captures the VYTRIX main window to a PNG (used for visual QA).
-param([string]$Out = "$env:TEMP\vytrix-shot.png", [string]$ProcessName = "VYTRIX")
+param([string]$Out = "$env:TEMP\vytrix-shot.png", [string]$ProcessName = "VYTRIX", [int]$ProcessId = 0)
 Add-Type -AssemblyName System.Drawing
 Add-Type @"
 using System;
@@ -11,7 +11,8 @@ public static class Cap {
   [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr h);
 }
 "@
-$p = Get-Process $ProcessName -ErrorAction Stop | Where-Object { $_.MainWindowHandle -ne 0 } | Select-Object -First 1
+$p = if ($ProcessId -gt 0) { Get-Process -Id $ProcessId -ErrorAction Stop }
+     else { Get-Process $ProcessName -ErrorAction Stop | Where-Object { $_.MainWindowHandle -ne 0 } | Select-Object -First 1 }
 $h = $p.MainWindowHandle
 $r = New-Object Cap+RECT
 [Cap]::GetWindowRect($h, [ref]$r) | Out-Null
